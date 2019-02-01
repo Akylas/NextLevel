@@ -53,32 +53,32 @@ public let NextLevelPhotoThumbnailKey = "NextLevelPhotoThumbnailKey"
 @objc public protocol NextLevelDelegate: AnyObject {
     
     // permission
-    func nextLevel(_ nextLevel: NextLevel, didUpdateAuthorizationStatus status: NextLevelAuthorizationStatus, forMediaType mediaType: AVMediaType)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didUpdateAuthorizationStatus status: NextLevelAuthorizationStatus, forMediaType mediaType: AVMediaType)
     
     // configuration
-    func nextLevel(_ nextLevel: NextLevel, didUpdateVideoConfiguration videoConfiguration: NextLevelVideoConfiguration)
-    func nextLevel(_ nextLevel: NextLevel, didUpdateAudioConfiguration audioConfiguration: NextLevelAudioConfiguration)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didUpdateVideoConfiguration videoConfiguration: NextLevelVideoConfiguration)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didUpdateAudioConfiguration audioConfiguration: NextLevelAudioConfiguration)
     
     // session
-    func nextLevelSessionWillStart(_ nextLevel: NextLevel)
-    func nextLevelSessionDidStart(_ nextLevel: NextLevel)
-    func nextLevelSessionDidStop(_ nextLevel: NextLevel)
+    @objc optional func nextLevelSessionWillStart(_ nextLevel: NextLevel)
+    @objc optional func nextLevelSessionDidStart(_ nextLevel: NextLevel)
+    @objc optional func nextLevelSessionDidStop(_ nextLevel: NextLevel)
     
     // session interruption
-    func nextLevelSessionWasInterrupted(_ nextLevel: NextLevel)
-    func nextLevelSessionInterruptionEnded(_ nextLevel: NextLevel)
+    @objc optional func nextLevelSessionWasInterrupted(_ nextLevel: NextLevel)
+    @objc optional func nextLevelSessionInterruptionEnded(_ nextLevel: NextLevel)
     
     // mode
-    func nextLevelCaptureModeWillChange(_ nextLevel: NextLevel)
-    func nextLevelCaptureModeDidChange(_ nextLevel: NextLevel)
+    @objc optional func nextLevelCaptureModeWillChange(_ nextLevel: NextLevel)
+    @objc optional func nextLevelCaptureModeDidChange(_ nextLevel: NextLevel)
 }
 
 /// Preview delegate, provides update for
-public protocol NextLevelPreviewDelegate: AnyObject {
+@objc public protocol NextLevelPreviewDelegate: AnyObject {
     
     // preview
-    func nextLevelWillStartPreview(_ nextLevel: NextLevel)
-    func nextLevelDidStopPreview(_ nextLevel: NextLevel)
+    @objc optional func nextLevelWillStartPreview(_ nextLevel: NextLevel)
+    @objc optional func nextLevelDidStopPreview(_ nextLevel: NextLevel)
     
 }
 
@@ -86,26 +86,26 @@ public protocol NextLevelPreviewDelegate: AnyObject {
 @objc public protocol NextLevelDeviceDelegate: AnyObject {
     
     // position, orientation
-    func nextLevelDevicePositionWillChange(_ nextLevel: NextLevel)
-    func nextLevelDevicePositionDidChange(_ nextLevel: NextLevel)
-    func nextLevel(_ nextLevel: NextLevel, didChangeDeviceOrientation deviceOrientation: NextLevelDeviceOrientation)
+    @objc optional func nextLevelDevicePositionWillChange(_ nextLevel: NextLevel)
+    @objc optional func nextLevelDevicePositionDidChange(_ nextLevel: NextLevel)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didChangeDeviceOrientation deviceOrientation: NextLevelDeviceOrientation)
     
     // format
-    func nextLevel(_ nextLevel: NextLevel, didChangeDeviceFormat deviceFormat: AVCaptureDevice.Format)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didChangeDeviceFormat deviceFormat: AVCaptureDevice.Format)
     
     // aperture, lens
-    func nextLevel(_ nextLevel: NextLevel, didChangeCleanAperture cleanAperture: CGRect)
-    func nextLevel(_ nextLevel: NextLevel, didChangeLensPosition lensPosition: Float)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didChangeCleanAperture cleanAperture: CGRect)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didChangeLensPosition lensPosition: Float)
     
     // focus, exposure, white balance
-    func nextLevelWillStartFocus(_ nextLevel: NextLevel)
-    func nextLevelDidStopFocus(_  nextLevel: NextLevel)
+    @objc optional func nextLevelWillStartFocus(_ nextLevel: NextLevel)
+    @objc optional func nextLevelDidStopFocus(_  nextLevel: NextLevel)
     
-    func nextLevelWillChangeExposure(_ nextLevel: NextLevel)
-    func nextLevelDidChangeExposure(_ nextLevel: NextLevel)
+    @objc optional func nextLevelWillChangeExposure(_ nextLevel: NextLevel)
+    @objc optional func nextLevelDidChangeExposure(_ nextLevel: NextLevel)
     
-    func nextLevelWillChangeWhiteBalance(_ nextLevel: NextLevel)
-    func nextLevelDidChangeWhiteBalance(_ nextLevel: NextLevel)
+    @objc optional func nextLevelWillChangeWhiteBalance(_ nextLevel: NextLevel)
+    @objc optional func nextLevelDidChangeWhiteBalance(_ nextLevel: NextLevel)
     
 }
 
@@ -114,13 +114,13 @@ public protocol NextLevelPreviewDelegate: AnyObject {
 /// Flash and torch delegate, provides updates on active flash and torch related changes.
 @objc public protocol NextLevelFlashAndTorchDelegate: AnyObject {
     
-    func nextLevelDidChangeFlashMode(_ nextLevel: NextLevel)
-    func nextLevelDidChangeTorchMode(_ nextLevel: NextLevel)
+    @objc optional func nextLevelDidChangeFlashMode(_ nextLevel: NextLevel)
+    @objc optional func nextLevelDidChangeTorchMode(_ nextLevel: NextLevel)
     
-    func nextLevelFlashActiveChanged(_ nextLevel: NextLevel)
-    func nextLevelTorchActiveChanged(_ nextLevel: NextLevel)
+    @objc optional func nextLevelFlashActiveChanged(_ nextLevel: NextLevel)
+    @objc optional func nextLevelTorchActiveChanged(_ nextLevel: NextLevel)
     
-    func nextLevelFlashAndTorchAvailabilityChanged(_ nextLevel: NextLevel)
+    @objc optional func nextLevelFlashAndTorchAvailabilityChanged(_ nextLevel: NextLevel)
     
 }
 
@@ -131,38 +131,38 @@ public protocol NextLevelPreviewDelegate: AnyObject {
 @objc public protocol NextLevelVideoDelegate: AnyObject {
     
     // video zoom
-    func nextLevel(_ nextLevel: NextLevel, didUpdateVideoZoomFactor videoZoomFactor: Float)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didUpdateVideoZoomFactor videoZoomFactor: Float)
     
     // video processing
-    func nextLevel(_ nextLevel: NextLevel, willProcessRawVideoSampleBuffer sampleBuffer: CMSampleBuffer, onQueue queue: DispatchQueue)
-    func nextLevel(_ nextLevel: NextLevel, renderToCustomContextWithImageBuffer imageBuffer: CVPixelBuffer, onQueue queue: DispatchQueue)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, willProcessRawVideoSampleBuffer sampleBuffer: CMSampleBuffer, onQueue queue: DispatchQueue)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, renderToCustomContextWithImageBuffer imageBuffer: CVPixelBuffer, onQueue queue: DispatchQueue)
     
     // ARKit video processing
     @available(iOS 11.0, *)
-    func nextLevel(_ nextLevel: NextLevel, willProcessFrame frame: AnyObject, pixelBuffer: CVPixelBuffer, timestamp: TimeInterval, onQueue queue: DispatchQueue)
+    @objc optional  func nextLevel(_ nextLevel: NextLevel, willProcessFrame frame: AnyObject, pixelBuffer: CVPixelBuffer, timestamp: TimeInterval, onQueue queue: DispatchQueue)
     
     // video recording session
-    func nextLevel(_ nextLevel: NextLevel, didSetupVideoInSession session: NextLevelSession)
-    func nextLevel(_ nextLevel: NextLevel, didSetupAudioInSession session: NextLevelSession)
+    @objc optional  func nextLevel(_ nextLevel: NextLevel, didSetupVideoInSession session: NextLevelSession)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didSetupAudioInSession session: NextLevelSession)
     
     // clip start/stop
-    func nextLevel(_ nextLevel: NextLevel, didStartClipInSession session: NextLevelSession)
-    func nextLevel(_ nextLevel: NextLevel, didCompleteClip clip: NextLevelClip, inSession session: NextLevelSession)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didStartClipInSession session: NextLevelSession)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didCompleteClip clip: NextLevelClip, inSession session: NextLevelSession)
     
     // clip file I/O
-    func nextLevel(_ nextLevel: NextLevel, didAppendVideoSampleBuffer sampleBuffer: CMSampleBuffer, inSession session: NextLevelSession)
-    func nextLevel(_ nextLevel: NextLevel, didSkipVideoSampleBuffer sampleBuffer: CMSampleBuffer, inSession session: NextLevelSession)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didAppendVideoSampleBuffer sampleBuffer: CMSampleBuffer, inSession session: NextLevelSession)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didSkipVideoSampleBuffer sampleBuffer: CMSampleBuffer, inSession session: NextLevelSession)
     
-    func nextLevel(_ nextLevel: NextLevel, didAppendVideoPixelBuffer pixelBuffer: CVPixelBuffer, timestamp: TimeInterval, inSession session: NextLevelSession)
-    func nextLevel(_ nextLevel: NextLevel, didSkipVideoPixelBuffer pixelBuffer: CVPixelBuffer, timestamp: TimeInterval, inSession session: NextLevelSession)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didAppendVideoPixelBuffer pixelBuffer: CVPixelBuffer, timestamp: TimeInterval, inSession session: NextLevelSession)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didSkipVideoPixelBuffer pixelBuffer: CVPixelBuffer, timestamp: TimeInterval, inSession session: NextLevelSession)
     
-    func nextLevel(_ nextLevel: NextLevel, didAppendAudioSampleBuffer sampleBuffer: CMSampleBuffer, inSession session: NextLevelSession)
-    func nextLevel(_ nextLevel: NextLevel, didSkipAudioSampleBuffer sampleBuffer: CMSampleBuffer, inSession session: NextLevelSession)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didAppendAudioSampleBuffer sampleBuffer: CMSampleBuffer, inSession session: NextLevelSession)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didSkipAudioSampleBuffer sampleBuffer: CMSampleBuffer, inSession session: NextLevelSession)
     
-    func nextLevel(_ nextLevel: NextLevel, didCompleteSession session: NextLevelSession)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didCompleteSession session: NextLevelSession)
     
     // video frame photo
-    func nextLevel(_ nextLevel: NextLevel, didCompletePhotoCaptureFromVideoFrame photoDict: [String : Any]?)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didCompletePhotoCaptureFromVideoFrame photoDict: [String : Any]?)
     
 }
 
@@ -171,16 +171,16 @@ public protocol NextLevelPreviewDelegate: AnyObject {
 /// Photo delegate, provides updates on photo related capture functionality.
 @objc public protocol NextLevelPhotoDelegate: AnyObject {
     
-    func nextLevel(_ nextLevel: NextLevel, willCapturePhotoWithConfiguration photoConfiguration: NextLevelPhotoConfiguration)
-    func nextLevel(_ nextLevel: NextLevel, didCapturePhotoWithConfiguration photoConfiguration: NextLevelPhotoConfiguration)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, willCapturePhotoWithConfiguration photoConfiguration: NextLevelPhotoConfiguration)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didCapturePhotoWithConfiguration photoConfiguration: NextLevelPhotoConfiguration)
     
-    func nextLevel(_ nextLevel: NextLevel, didProcessPhotoCaptureWith photoDict: [String: Any]?, photoConfiguration: NextLevelPhotoConfiguration)
-    func nextLevel(_ nextLevel: NextLevel, didProcessRawPhotoCaptureWith photoDict: [String: Any]?, photoConfiguration: NextLevelPhotoConfiguration)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didProcessPhotoCaptureWith photoDict: [String: Any]?, photoConfiguration: NextLevelPhotoConfiguration)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didProcessRawPhotoCaptureWith photoDict: [String: Any]?, photoConfiguration: NextLevelPhotoConfiguration)
     
-    func nextLevelDidCompletePhotoCapture(_ nextLevel: NextLevel)
+    @objc optional func nextLevelDidCompletePhotoCapture(_ nextLevel: NextLevel)
     
     @available(iOS 11.0, *)
-    func nextLevel(_ nextLevel: NextLevel, didFinishProcessingPhoto photo: AVCapturePhoto)
+    @objc optional func nextLevel(_ nextLevel: NextLevel, didFinishProcessingPhoto photo: AVCapturePhoto)
 }
 
 // MARK: - NextLevelDepthDataDelegate
@@ -190,10 +190,10 @@ public protocol NextLevelPreviewDelegate: AnyObject {
 @objc public protocol NextLevelDepthDataDelegate: AnyObject {
     
     @available(iOS 11.0, *)
-    func depthDataOutput(_ nextLevel: NextLevel, didOutput depthData: AVDepthData, timestamp: CMTime)
+    @objc optional func depthDataOutput(_ nextLevel: NextLevel, didOutput depthData: AVDepthData, timestamp: CMTime)
     
     @available(iOS 11.0, *)
-    func depthDataOutput(_ nextLevel: NextLevel, didDrop depthData: AVDepthData, timestamp: CMTime, reason: AVCaptureOutput.DataDroppedReason)
+    @objc optional func depthDataOutput(_ nextLevel: NextLevel, didDrop depthData: AVDepthData, timestamp: CMTime, reason: AVCaptureOutput.DataDroppedReason)
     
 }
 #endif
@@ -201,17 +201,17 @@ public protocol NextLevelPreviewDelegate: AnyObject {
 // MARK: - NextLevelPortraitEffectsMatteDelegate
 
 /// Portrait Effects Matte delegate, provides portrait effects matte updates
-public protocol NextLevelPortraitEffectsMatteDelegate: AnyObject {
+@objc public protocol NextLevelPortraitEffectsMatteDelegate: AnyObject {
     
     @available(iOS 12.0, *)
-    func portraitEffectsMatteOutput(_ nextLevel: NextLevel, didOutput portraitEffectsMatte: AVPortraitEffectsMatte)
+    @objc optional func portraitEffectsMatteOutput(_ nextLevel: NextLevel, didOutput portraitEffectsMatte: AVPortraitEffectsMatte)
     
 }
 
 // MARK: - NextLevelMetadataOutputObjectsDelegate
 
 /// Metadata Output delegate, provides objects like faces and barcodes
-public protocol NextLevelMetadataOutputObjectsDelegate: AnyObject {
+@objc public protocol NextLevelMetadataOutputObjectsDelegate: AnyObject {
 
-    func metadataOutputObjects(_ nextLevel: NextLevel, didOutput metadataObjects: [AVMetadataObject])
+    @objc optional func metadataOutputObjects(_ nextLevel: NextLevel, didOutput metadataObjects: [AVMetadataObject])
 }

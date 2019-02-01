@@ -273,7 +273,7 @@ private let NextLevelRequiredMinimumStorageSpaceInBytes: UInt64 = 49999872 // ~4
                     return
             }
             
-            self.delegate?.nextLevelCaptureModeWillChange(self)
+            self.delegate?.nextLevelCaptureModeWillChange?(self)
             
             self.executeClosureAsyncOnSessionQueueIfNecessary {
                 self.configureSession()
@@ -286,7 +286,7 @@ private let NextLevelRequiredMinimumStorageSpaceInBytes: UInt64 = 49999872 // ~4
                     self.setupContextIfNecessary()
                 }
                 #endif
-                self.delegate?.nextLevelCaptureModeDidChange(self)
+                self.delegate?.nextLevelCaptureModeDidChange?(self)
             }
         }
     }
@@ -524,7 +524,7 @@ extension NextLevel {
         AVCaptureDevice.requestAccess(for: mediaType) { (granted: Bool) in
             let status: NextLevelAuthorizationStatus = (granted == true) ? .authorized : .notAuthorized
             DispatchQueue.main.async {
-                self.delegate?.nextLevel(self, didUpdateAuthorizationStatus: status, forMediaType: mediaType)
+                self.delegate?.nextLevel?(self, didUpdateAuthorizationStatus: status, forMediaType: mediaType)
             }
         }
     }
@@ -551,7 +551,7 @@ extension NextLevel {
 
 // MARK: - session start/stop
 
-extension NextLevel {
+@objc extension NextLevel {
     
     /// Starts the current recording session.
     ///
@@ -629,9 +629,9 @@ extension NextLevel {
                 self.commitConfiguration()
                 
                 if session.isRunning == false {
-                    self.delegate?.nextLevelSessionWillStart(self)
+                    self.delegate?.nextLevelSessionWillStart?(self)
                     session.startRunning()
-                    self.previewDelegate?.nextLevelWillStartPreview(self)
+                    self.previewDelegate?.nextLevelWillStartPreview?(self)
                     
                     // nextLevelSessionDidStart is called from AVFoundation
                 }
@@ -684,7 +684,7 @@ extension NextLevel {
 
 // MARK: - private session configuration support
 
-extension NextLevel {
+@objc extension NextLevel {
     
     // re-entrant configuration lock, thanks to SCRecorder
     internal func beginConfiguration() {
@@ -756,7 +756,7 @@ extension NextLevel {
                     let changingPosition = (captureDevice.position != self._currentDevice?.position)
                     if changingPosition {
                         DispatchQueue.main.async {
-                            self.deviceDelegate?.nextLevelDevicePositionWillChange(self)
+                            self.deviceDelegate?.nextLevelDevicePositionWillChange?(self)
                         }
                     }
                     
@@ -767,7 +767,7 @@ extension NextLevel {
                     
                     if changingPosition {
                         DispatchQueue.main.async {
-                            self.deviceDelegate?.nextLevelDevicePositionDidChange(self)
+                            self.deviceDelegate?.nextLevelDevicePositionDidChange?(self)
                         }
                     }
                 }
@@ -784,13 +784,13 @@ extension NextLevel {
         
         if shouldConfigureVideo {
             DispatchQueue.main.async {
-                self.delegate?.nextLevel(self, didUpdateVideoConfiguration: self.videoConfiguration)
+                self.delegate?.nextLevel?(self, didUpdateVideoConfiguration: self.videoConfiguration)
             }
         }
         
         if shouldConfigureAudio {
             DispatchQueue.main.async {
-                self.delegate?.nextLevel(self, didUpdateAudioConfiguration: self.audioConfiguration)
+                self.delegate?.nextLevel?(self, didUpdateAudioConfiguration: self.audioConfiguration)
             }
         }
     }
@@ -1230,7 +1230,7 @@ extension NextLevel {
 
 // MARK: - preview
 
-extension NextLevel {
+@objc extension NextLevel {
     
     // preview
     
@@ -1251,7 +1251,7 @@ extension NextLevel {
 
 // MARK: - capture device switching
 
-extension NextLevel {
+@objc extension NextLevel {
     
     /// Triggers a camera device position change.
     public func flipCaptureDevicePosition() {
@@ -1304,7 +1304,7 @@ extension NextLevel {
         }
         
         if didChangeOrientation == true {
-            self.deviceDelegate?.nextLevel(self, didChangeDeviceOrientation: currentOrientation)
+            self.deviceDelegate?.nextLevel?(self, didChangeDeviceOrientation: currentOrientation)
         }
     }
     
@@ -1321,7 +1321,7 @@ extension NextLevel {
 
 // MARK: - mirroring
 
-extension NextLevel {
+@objc extension NextLevel {
     
     // mirroring
     
@@ -1393,7 +1393,7 @@ extension NextLevel {
 
 // MARK: - flash and torch
 
-extension NextLevel {
+@objc extension NextLevel {
     
     /// Checks if a flash is available.
     public var isFlashAvailable: Bool {
@@ -1470,7 +1470,7 @@ extension NextLevel {
 
 // MARK: - focus, exposure, white balance
 
-extension NextLevel {
+@objc extension NextLevel {
     
     // focus, exposure, and white balance
     // note: focus and exposure modes change when adjusting on point
@@ -1931,7 +1931,7 @@ extension NextLevel {
         }
         
         if self.focusMode != .locked {
-            self.deviceDelegate?.nextLevelWillStartFocus(self)
+            self.deviceDelegate?.nextLevelWillStartFocus?(self)
             self.focusAtAdjustedPointOfInterest(adjustedPoint: CGPoint(x: 0.5, y: 0.5))
         }
     }
@@ -1971,7 +1971,7 @@ extension NextLevel {
     
     internal func focusStarted() {
         DispatchQueue.main.async {
-            self.deviceDelegate?.nextLevelWillStartFocus(self)
+            self.deviceDelegate?.nextLevelWillStartFocus?(self)
         }
     }
     
@@ -1998,13 +1998,13 @@ extension NextLevel {
         }
         
         DispatchQueue.main.async {
-            self.deviceDelegate?.nextLevelDidStopFocus(self)
+            self.deviceDelegate?.nextLevelDidStopFocus?(self)
         }
     }
     
     internal func exposureStarted() {
         DispatchQueue.main.async {
-            self.deviceDelegate?.nextLevelWillChangeExposure(self)
+            self.deviceDelegate?.nextLevelWillChangeExposure?(self)
         }
     }
     
@@ -2031,26 +2031,26 @@ extension NextLevel {
         }
         
         DispatchQueue.main.async {
-            self.deviceDelegate?.nextLevelDidChangeExposure(self)
+            self.deviceDelegate?.nextLevelDidChangeExposure?(self)
         }
     }
     
     internal func whiteBalanceStarted() {
         DispatchQueue.main.async {
-            self.deviceDelegate?.nextLevelWillChangeWhiteBalance(self)
+            self.deviceDelegate?.nextLevelWillChangeWhiteBalance?(self)
         }
     }
     
     internal func whiteBalanceEnded() {
         DispatchQueue.main.async {
-            self.deviceDelegate?.nextLevelDidChangeWhiteBalance(self)
+            self.deviceDelegate?.nextLevelDidChangeWhiteBalance?(self)
         }
     }
 }
 
 // MARK: - frame rate support
 
-extension NextLevel {
+@objc extension NextLevel {
     
     // frame rate
     
@@ -2145,7 +2145,7 @@ extension NextLevel {
                     device.unlockForConfiguration()
                     
                     DispatchQueue.main.async {
-                        self.deviceDelegate?.nextLevel(self, didChangeDeviceFormat: format)
+                        self.deviceDelegate?.nextLevel?(self, didChangeDeviceFormat: format)
                     }
                 } catch {
                     print("NextLevel, active device format failed to lock device for configuration")
@@ -2160,7 +2160,7 @@ extension NextLevel {
 
 // MARK: - video capture
 
-extension NextLevel {
+@objc extension NextLevel {
     
     /// Checks if video capture is supported by the hardware.
     public var isVideoCaptureSupported: Bool {
@@ -2237,7 +2237,7 @@ extension NextLevel {
                 if let buffer = buffer {
                     if CVPixelBufferLockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0)) == kCVReturnSuccess {
                         // only called from captureQueue, populates self._sessionVideoCustomContextImageBuffer
-                        self.videoDelegate?.nextLevel(self, renderToCustomContextWithImageBuffer: buffer, onQueue: self._sessionQueue)
+                        self.videoDelegate?.nextLevel?(self, renderToCustomContextWithImageBuffer: buffer, onQueue: self._sessionQueue)
                         CVPixelBufferUnlockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0))
                     }
                 }
@@ -2315,7 +2315,7 @@ extension NextLevel {
             //    photoDict[NextLevelPhotoThumbnailKey] = tData
             //}
             DispatchQueue.main.sync {
-                self.videoDelegate?.nextLevel(self, didCompletePhotoCaptureFromVideoFrame: photoDict)
+                self.videoDelegate?.nextLevel?(self, didCompletePhotoCaptureFromVideoFrame: photoDict)
             }
             
         }
@@ -2373,7 +2373,7 @@ extension NextLevel {
                     session.endClip(completionHandler: { (sessionClip: NextLevelClip?, error: Error?) in
                         if let sessionClip = sessionClip {
                             DispatchQueue.main.async {
-                                self.videoDelegate?.nextLevel(self, didCompleteClip: sessionClip, inSession: session)
+                                self.videoDelegate?.nextLevel?(self, didCompleteClip: sessionClip, inSession: session)
                             }
                             if let completionHandler = completionHandler {
                                 DispatchQueue.main.async(execute: completionHandler)
@@ -2399,7 +2399,7 @@ extension NextLevel {
             session.isReady == false {
             session.beginClip()
             DispatchQueue.main.async {
-                self.videoDelegate?.nextLevel(self, didStartClipInSession: session)
+                self.videoDelegate?.nextLevel?(self, didStartClipInSession: session)
             }
         }
     }
@@ -2408,7 +2408,7 @@ extension NextLevel {
 
 // MARK: - photo capture
 
-extension NextLevel {
+@objc extension NextLevel {
     
     /// Checks if a photo capture operation can be performed, based on available storage space and supported hardware functionality.
     public var canCapturePhoto: Bool {
@@ -2456,7 +2456,7 @@ extension NextLevel {
 
 // MARK: - NextLevelSession and sample buffer processing
 
-extension NextLevel {
+@objc extension NextLevel {
     
     // sample buffer processing
     
@@ -2469,7 +2469,7 @@ extension NextLevel {
                 }
             }
             DispatchQueue.main.async {
-                self.videoDelegate?.nextLevel(self, didSetupVideoInSession: session)
+                self.videoDelegate?.nextLevel?(self, didSetupVideoInSession: session)
             }
         }
         
@@ -2487,7 +2487,7 @@ extension NextLevel {
             if let imageBuffer = imageBuffer {
                 if CVPixelBufferLockBaseAddress(imageBuffer, CVPixelBufferLockFlags(rawValue: 0)) == kCVReturnSuccess {
                     // only called from captureQueue
-                    self.videoDelegate?.nextLevel(self, renderToCustomContextWithImageBuffer: imageBuffer, onQueue: self._sessionQueue)
+                    self.videoDelegate?.nextLevel?(self, renderToCustomContextWithImageBuffer: imageBuffer, onQueue: self._sessionQueue)
                 } else {
                     self._sessionVideoCustomContextImageBuffer = nil
                 }
@@ -2510,12 +2510,12 @@ extension NextLevel {
                 self._lastVideoFrameTimeInterval = CACurrentMediaTime()
                 if success == true {
                     DispatchQueue.main.async {
-                        self.videoDelegate?.nextLevel(self, didAppendVideoSampleBuffer: sampleBuffer, inSession: session)
+                        self.videoDelegate?.nextLevel?(self, didAppendVideoSampleBuffer: sampleBuffer, inSession: session)
                     }
                     self.checkSessionDuration()
                 } else {
                     DispatchQueue.main.async {
-                        self.videoDelegate?.nextLevel(self, didSkipVideoSampleBuffer: sampleBuffer, inSession: session)
+                        self.videoDelegate?.nextLevel?(self, didSkipVideoSampleBuffer: sampleBuffer, inSession: session)
                     }
                 }
             })
@@ -2544,7 +2544,7 @@ extension NextLevel {
                 }
             }
             DispatchQueue.main.async {
-                self.videoDelegate?.nextLevel(self, didSetupVideoInSession: session)
+                self.videoDelegate?.nextLevel?(self, didSetupVideoInSession: session)
             }
         }
         
@@ -2562,7 +2562,7 @@ extension NextLevel {
             if let imageBuffer = imageBuffer {
                 if CVPixelBufferLockBaseAddress(imageBuffer, CVPixelBufferLockFlags(rawValue: 0)) == kCVReturnSuccess {
                     // only called from captureQueue
-                    self.videoDelegate?.nextLevel(self, renderToCustomContextWithImageBuffer: imageBuffer, onQueue: self._sessionQueue)
+                    self.videoDelegate?.nextLevel?(self, renderToCustomContextWithImageBuffer: imageBuffer, onQueue: self._sessionQueue)
                 } else {
                     self._sessionVideoCustomContextImageBuffer = nil
                 }
@@ -2581,12 +2581,12 @@ extension NextLevel {
                 self._lastVideoFrameTimeInterval = CACurrentMediaTime()
                 if success {
                     DispatchQueue.main.async {
-                        self.videoDelegate?.nextLevel(self, didAppendVideoPixelBuffer: pixelBuffer, timestamp: timestamp, inSession: session)
+                        self.videoDelegate?.nextLevel?(self, didAppendVideoPixelBuffer: pixelBuffer, timestamp: timestamp, inSession: session)
                     }
                     self.checkSessionDuration()
                 } else {
                     DispatchQueue.main.async {
-                        self.videoDelegate?.nextLevel(self, didSkipVideoPixelBuffer: pixelBuffer, timestamp: timestamp, inSession: session)
+                        self.videoDelegate?.nextLevel?(self, didSkipVideoPixelBuffer: pixelBuffer, timestamp: timestamp, inSession: session)
                     }
                 }
             })
@@ -2614,7 +2614,7 @@ extension NextLevel {
             }
             
             DispatchQueue.main.async {
-                self.videoDelegate?.nextLevel(self, didSetupAudioInSession: session)
+                self.videoDelegate?.nextLevel?(self, didSetupAudioInSession: session)
             }
         }
         
@@ -2624,12 +2624,12 @@ extension NextLevel {
             session.appendAudio(withSampleBuffer: sampleBuffer, completionHandler: { (success: Bool) -> Void in
                 if success {
                     DispatchQueue.main.async {
-                        self.videoDelegate?.nextLevel(self, didAppendAudioSampleBuffer: sampleBuffer, inSession: session)
+                        self.videoDelegate?.nextLevel?(self, didAppendAudioSampleBuffer: sampleBuffer, inSession: session)
                     }
                     self.checkSessionDuration()
                 } else {
                     DispatchQueue.main.async {
-                        self.videoDelegate?.nextLevel(self, didSkipAudioSampleBuffer: sampleBuffer, inSession: session)
+                        self.videoDelegate?.nextLevel?(self, didSkipAudioSampleBuffer: sampleBuffer, inSession: session)
                     }
                 }
             })
@@ -2647,13 +2647,13 @@ extension NextLevel {
                     session.endClip(completionHandler: { (sessionClip: NextLevelClip?, error: Error?) in
                         if let clip = sessionClip {
                             DispatchQueue.main.async {
-                                self.videoDelegate?.nextLevel(self, didCompleteClip: clip, inSession: session)
+                                self.videoDelegate?.nextLevel?(self, didCompleteClip: clip, inSession: session)
                             }
                         } else if let _ = error {
                             // TODO report error
                         }
                         DispatchQueue.main.async {
-                            self.videoDelegate?.nextLevel(self, didCompleteSession: session)
+                            self.videoDelegate?.nextLevel?(self, didCompleteSession: session)
                         }
                     })
                 }
@@ -2664,7 +2664,7 @@ extension NextLevel {
 
 // MARK: - rendering support
 
-extension NextLevel {
+@objc extension NextLevel {
     
     private func setupContextIfNecessary() {
         if self._ciContext == nil {
@@ -2714,11 +2714,11 @@ extension NextLevel {
 
 // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate
 
-extension NextLevel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
+@objc extension NextLevel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     
     public func captureOutput(_ captureOutput: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         if self.captureMode == .videoWithoutAudio && captureOutput == self._videoOutput {
-            self.videoDelegate?.nextLevel(self, willProcessRawVideoSampleBuffer: sampleBuffer, onQueue: self._sessionQueue)
+            self.videoDelegate?.nextLevel?(self, willProcessRawVideoSampleBuffer: sampleBuffer, onQueue: self._sessionQueue)
             self._lastVideoFrame = sampleBuffer
             if let session = self._recordingSession {
                 self.handleVideoOutput(sampleBuffer: sampleBuffer, session: session)
@@ -2727,7 +2727,7 @@ extension NextLevel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudi
             let audioOutput = self._audioOutput {
             switch captureOutput {
             case videoOutput:
-                self.videoDelegate?.nextLevel(self, willProcessRawVideoSampleBuffer: sampleBuffer, onQueue: self._sessionQueue)
+                self.videoDelegate?.nextLevel?(self, willProcessRawVideoSampleBuffer: sampleBuffer, onQueue: self._sessionQueue)
                 self._lastVideoFrame = sampleBuffer
                 if let session = self._recordingSession {
                     self.handleVideoOutput(sampleBuffer: sampleBuffer, session: session)
@@ -2749,7 +2749,7 @@ extension NextLevel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudi
 
 // MARK: - AVCaptureFileOutputDelegate
 
-extension NextLevel: AVCaptureFileOutputRecordingDelegate {
+@objc extension NextLevel: AVCaptureFileOutputRecordingDelegate {
     
     public func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
     }
@@ -2761,17 +2761,17 @@ extension NextLevel: AVCaptureFileOutputRecordingDelegate {
 
 // MARK: - AVCapturePhotoCaptureDelegate
 
-extension NextLevel: AVCapturePhotoCaptureDelegate {
+@objc extension NextLevel: AVCapturePhotoCaptureDelegate {
     
     public func photoOutput(_ captureOutput: AVCapturePhotoOutput, willCapturePhotoFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
         DispatchQueue.main.async {
-            self.photoDelegate?.nextLevel(self, willCapturePhotoWithConfiguration: self.photoConfiguration)
+            self.photoDelegate?.nextLevel?(self, willCapturePhotoWithConfiguration: self.photoConfiguration)
         }
     }
     
     public func photoOutput(_ output: AVCapturePhotoOutput, didCapturePhotoFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
         DispatchQueue.main.async {
-            self.photoDelegate?.nextLevel(self, didCapturePhotoWithConfiguration: self.photoConfiguration)
+            self.photoDelegate?.nextLevel?(self, didCapturePhotoWithConfiguration: self.photoConfiguration)
         }
     }
     
@@ -2803,7 +2803,7 @@ extension NextLevel: AVCapturePhotoCaptureDelegate {
             //}
             
             DispatchQueue.main.async {
-                self.photoDelegate?.nextLevel(self, didProcessPhotoCaptureWith: photoDict, photoConfiguration: self.photoConfiguration)
+                self.photoDelegate?.nextLevel?(self, didProcessPhotoCaptureWith: photoDict, photoConfiguration: self.photoConfiguration)
             }
         }
     }
@@ -2836,27 +2836,27 @@ extension NextLevel: AVCapturePhotoCaptureDelegate {
             //}
             
             DispatchQueue.main.async {
-                self.photoDelegate?.nextLevel(self, didProcessRawPhotoCaptureWith: photoDict, photoConfiguration: self.photoConfiguration)
+                self.photoDelegate?.nextLevel?(self, didProcessRawPhotoCaptureWith: photoDict, photoConfiguration: self.photoConfiguration)
             }
         }
     }
     
     public func photoOutput(_ captureOutput: AVCapturePhotoOutput, didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings, error: Error?) {
         DispatchQueue.main.async {
-            self.photoDelegate?.nextLevelDidCompletePhotoCapture(self)
+            self.photoDelegate?.nextLevelDidCompletePhotoCapture?(self)
         }
     }
     
     @available(iOS 11.0, *)
     public func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         DispatchQueue.main.async {
-            self.photoDelegate?.nextLevel(self, didFinishProcessingPhoto: photo)
+            self.photoDelegate?.nextLevel?(self, didFinishProcessingPhoto: photo)
         }
         
         if #available(iOS 12.0, *){
             if let portraitEffectsMatte = photo.portraitEffectsMatte {
                 DispatchQueue.main.async {
-                    self.portraitEffectsMatteDelegate?.portraitEffectsMatteOutput(self, didOutput: portraitEffectsMatte)
+                    self.portraitEffectsMatteDelegate?.portraitEffectsMatteOutput?(self, didOutput: portraitEffectsMatte)
                 }
             }
         }
@@ -2868,7 +2868,7 @@ extension NextLevel: AVCapturePhotoCaptureDelegate {
 
 #if USE_TRUE_DEPTH
 @available(iOS 11.0, *)
-extension NextLevel: AVCaptureDepthDataOutputDelegate {
+@objc extension NextLevel: AVCaptureDepthDataOutputDelegate {
     
     public func depthDataOutput(_ output: AVCaptureDepthDataOutput, didOutput depthData: AVDepthData, timestamp: CMTime, connection: AVCaptureConnection) {
         DispatchQueue.main.async {
@@ -2886,7 +2886,7 @@ extension NextLevel: AVCaptureDepthDataOutputDelegate {
 // MARK: - ARSession
 
 @available(iOS 11.0, *)
-extension NextLevel {
+@objc extension NextLevel {
     
     public func arSession(_ session: ARSession, didUpdate frame: ARFrame) {
         var pixelBuffer = frame.capturedImage
@@ -2898,7 +2898,7 @@ extension NextLevel {
             let adjustedPixelBuffer = self._ciContext?.createPixelBuffer(fromPixelBuffer: pixelBuffer, withOrientation: .right, pixelBufferPool: pixelBufferPool) {
             pixelBuffer = adjustedPixelBuffer
             
-            self.videoDelegate?.nextLevel(self, willProcessFrame: frame, pixelBuffer: pixelBuffer, timestamp: timestamp, onQueue: self._sessionQueue)
+            self.videoDelegate?.nextLevel?(self, willProcessFrame: frame, pixelBuffer: pixelBuffer, timestamp: timestamp, onQueue: self._sessionQueue)
             self._lastARFrame = pixelBuffer
             
             if let session = self._recordingSession {
@@ -2919,7 +2919,7 @@ extension NextLevel {
 
 // MARK: - AVCaptureMetadataOutputObjectsDelegate
 
-extension NextLevel: AVCaptureMetadataOutputObjectsDelegate {
+@objc extension NextLevel: AVCaptureMetadataOutputObjectsDelegate {
 
     public func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         // convert metadata object coordinates to preview layer coordinates
@@ -2928,14 +2928,14 @@ extension NextLevel: AVCaptureMetadataOutputObjectsDelegate {
         }
 
         // main queue is explicitly specified during configuration
-        self.metadataObjectsDelegate?.metadataOutputObjects(self, didOutput: convertedMetadataObjects)
+        self.metadataObjectsDelegate?.metadataOutputObjects?(self, didOutput: convertedMetadataObjects)
     }
 
 }
 
 // MARK: - queues
 
-extension NextLevel {
+@objc extension NextLevel {
     
     internal func executeClosureAsyncOnSessionQueueIfNecessary(withClosure closure: @escaping () -> Void) {
         self._sessionQueue.async(execute: closure)
@@ -2952,7 +2952,7 @@ extension NextLevel {
 
 // MARK: - NSNotifications
 
-extension NextLevel {
+@objc extension NextLevel {
     
     // application
     
@@ -3000,13 +3000,13 @@ extension NextLevel {
         //self.performRecoveryCheckIfNecessary()
         // TODO
         DispatchQueue.main.async {
-            self.delegate?.nextLevelSessionDidStart(self)
+            self.delegate?.nextLevelSessionDidStart?(self)
         }
     }
     
     @objc internal func handleSessionDidStopRunning(_ notification: Notification) {
         DispatchQueue.main.async {
-            self.delegate?.nextLevelSessionDidStop(self)
+            self.delegate?.nextLevelSessionDidStop?(self)
         }
     }
     
@@ -3030,18 +3030,18 @@ extension NextLevel {
     @objc public func handleSessionWasInterrupted(_ notification: Notification) {
         DispatchQueue.main.async {
             if self._recording {
-                self.delegate?.nextLevelSessionDidStop(self)
+                self.delegate?.nextLevelSessionDidStop?(self)
             }
             
             DispatchQueue.main.async {
-                self.delegate?.nextLevelSessionWasInterrupted(self)
+                self.delegate?.nextLevelSessionWasInterrupted?(self)
             }
         }
     }
     
     @objc public func handleSessionInterruptionEnded(_ notification: Notification) {
         DispatchQueue.main.async {
-            self.delegate?.nextLevelSessionInterruptionEnded(self)
+            self.delegate?.nextLevelSessionInterruptionEnded?(self)
         }
     }
     
@@ -3070,7 +3070,7 @@ extension NextLevel {
                 let port = input.ports.first,
                 let formatDescription: CMFormatDescription = port.formatDescription {
                 let cleanAperture = CMVideoFormatDescriptionGetCleanAperture(formatDescription, originIsAtTopLeft: true)
-                self.deviceDelegate?.nextLevel(self, didChangeCleanAperture: cleanAperture)
+                self.deviceDelegate?.nextLevel?(self, didChangeCleanAperture: cleanAperture)
             }
         }
     }
@@ -3086,7 +3086,7 @@ extension NextLevel {
 
 // MARK: - KVO observers
 
-extension NextLevel {
+@objc extension NextLevel {
     
     internal func addCaptureDeviceObservers(_ currentDevice: AVCaptureDevice) {
         
@@ -3120,7 +3120,7 @@ extension NextLevel {
             }
             
             DispatchQueue.main.async {
-                strongSelf.flashDelegate?.nextLevelFlashAndTorchAvailabilityChanged(strongSelf)
+                strongSelf.flashDelegate?.nextLevelFlashAndTorchAvailabilityChanged?(strongSelf)
             }
         })
         
@@ -3130,7 +3130,7 @@ extension NextLevel {
             }
             
             DispatchQueue.main.async {
-                strongSelf.flashDelegate?.nextLevelFlashAndTorchAvailabilityChanged(strongSelf)
+                strongSelf.flashDelegate?.nextLevelFlashAndTorchAvailabilityChanged?(strongSelf)
             }
         })
         
@@ -3140,7 +3140,7 @@ extension NextLevel {
             }
             
             DispatchQueue.main.async {
-                strongSelf.flashDelegate?.nextLevelTorchActiveChanged(strongSelf)
+                strongSelf.flashDelegate?.nextLevelTorchActiveChanged?(strongSelf)
             }
         })
         
@@ -3151,7 +3151,7 @@ extension NextLevel {
             
             if object.focusMode != .locked {
                 DispatchQueue.main.async {
-                    strongSelf.deviceDelegate?.nextLevel(strongSelf, didChangeLensPosition: object.lensPosition)
+                    strongSelf.deviceDelegate?.nextLevel?(strongSelf, didChangeLensPosition: object.lensPosition)
                 }
             }
         })
@@ -3205,7 +3205,7 @@ extension NextLevel {
             }
             
             DispatchQueue.main.async {
-                strongSelf.videoDelegate?.nextLevel(strongSelf, didUpdateVideoZoomFactor: strongSelf.videoZoomFactor)
+                strongSelf.videoDelegate?.nextLevel?(strongSelf, didUpdateVideoZoomFactor: strongSelf.videoZoomFactor)
             }
         })
     }
@@ -3249,7 +3249,7 @@ extension NextLevel {
             }
             
             DispatchQueue.main.async {
-                strongSelf.flashDelegate?.nextLevelFlashActiveChanged(strongSelf)
+                strongSelf.flashDelegate?.nextLevelFlashActiveChanged?(strongSelf)
             }
         })
         
