@@ -33,7 +33,7 @@ import ARKit
 // MARK: - MediaTypeConfiguration
 
 /// NextLevelConfiguration, media capture configuration object
-@objcMembers public class NextLevelConfiguration {
+@objcMembers public class NextLevelConfiguration: NSObject {
 
     // MARK: - types
     
@@ -146,7 +146,7 @@ import ARKit
     
     // MARK: - object lifecycle
     
-    public init() {
+    override public init() {
         self.preset = AVCaptureSession.Preset.high
         self.options = nil
     }
@@ -165,7 +165,7 @@ import ARKit
 // MARK: - VideoConfiguration
 
 /// NextLevelVideoConfiguration, video capture configuration object
-public class NextLevelVideoConfiguration: NextLevelConfiguration {
+@objcMembers public class NextLevelVideoConfiguration: NextLevelConfiguration {
     
     // MARK: - types
     

@@ -35,7 +35,7 @@ import ARKit
 
 // MARK: - types
 
-public enum NextLevelAuthorizationStatus: Int, CustomStringConvertible {
+@objc public enum NextLevelAuthorizationStatus: Int, CustomStringConvertible {
     case notDetermined = 0
     case notAuthorized
     case authorized
@@ -54,7 +54,7 @@ public enum NextLevelAuthorizationStatus: Int, CustomStringConvertible {
     }
 }
 
-public enum NextLevelDeviceType: Int, CustomStringConvertible {
+@objc public enum NextLevelDeviceType: Int, CustomStringConvertible {
     case microphone = 0
     case wideAngleCamera
     case telephotoCamera
@@ -111,7 +111,7 @@ public enum NextLevelDeviceType: Int, CustomStringConvertible {
 /// Operation modes for NextLevel.
 /// Note: video, audio, and videoWithoutAudio options support multi clip recording.
 /// Movie is strictly for single clip recording.
-public enum NextLevelCaptureMode: Int, CustomStringConvertible {
+@objc public enum NextLevelCaptureMode: Int, CustomStringConvertible {
     case video = 0
     case photo
     case audio
@@ -149,9 +149,9 @@ public typealias NextLevelWhiteBalanceMode = AVCaptureDevice.WhiteBalanceMode
 public typealias NextLevelFlashMode = AVCaptureDevice.FlashMode
 public typealias NextLevelTorchMode = AVCaptureDevice.TorchMode
 
-public typealias NextLevelVideoStabilizationMode = AVCaptureVideoStabilizationMode
+ public typealias NextLevelVideoStabilizationMode = AVCaptureVideoStabilizationMode
 
-public enum NextLevelMirroringMode: Int, CustomStringConvertible {
+@objc public enum NextLevelMirroringMode: Int, CustomStringConvertible {
     case off = 0
     case on
     case auto

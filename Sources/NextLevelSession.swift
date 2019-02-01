@@ -29,7 +29,7 @@ import AVFoundation
 // MARK: - NextLevelSession
 
 /// NextLevelSession, a powerful object for managing and editing a set of recorded media clips.
-public class NextLevelSession {
+@objcMembers public class NextLevelSession: NSObject {
     
     /// Output directory for a session.
     public var outputDirectory: String
@@ -214,7 +214,7 @@ public class NextLevelSession {
     }
     
     /// Initializer.
-    public init() {
+    override public init() {
         self._identifier = UUID()
         self._date = Date()
         self.outputDirectory = NSTemporaryDirectory()
