@@ -50,7 +50,7 @@ public let NextLevelPhotoThumbnailKey = "NextLevelPhotoThumbnailKey"
 // MARK: - NextLevelDelegate
 
 /// NextLevel delegate, provides updates for authorization, configuration changes, session state, preview state, and mode changes.
-public protocol NextLevelDelegate: AnyObject {
+@objc public protocol NextLevelDelegate: AnyObject {
     
     // permission
     func nextLevel(_ nextLevel: NextLevel, didUpdateAuthorizationStatus status: NextLevelAuthorizationStatus, forMediaType mediaType: AVMediaType)
@@ -83,7 +83,7 @@ public protocol NextLevelPreviewDelegate: AnyObject {
 }
 
 /// Device delegate, provides updates on device position, orientation, clean aperture, focus, exposure, and white balances changes.
-public protocol NextLevelDeviceDelegate: AnyObject {
+@objc public protocol NextLevelDeviceDelegate: AnyObject {
     
     // position, orientation
     func nextLevelDevicePositionWillChange(_ nextLevel: NextLevel)
@@ -112,7 +112,7 @@ public protocol NextLevelDeviceDelegate: AnyObject {
 // MARK: - NextLevelFlashAndTorchDelegate
 
 /// Flash and torch delegate, provides updates on active flash and torch related changes.
-public protocol NextLevelFlashAndTorchDelegate: AnyObject {
+@objc public protocol NextLevelFlashAndTorchDelegate: AnyObject {
     
     func nextLevelDidChangeFlashMode(_ nextLevel: NextLevel)
     func nextLevelDidChangeTorchMode(_ nextLevel: NextLevel)
@@ -128,7 +128,7 @@ public protocol NextLevelFlashAndTorchDelegate: AnyObject {
 
 /// Video delegate, provides updates on video related recording and capture functionality.
 /// All methods are called on the main queue with the exception of nextLevel:renderToCustomContextWithSampleBuffer:onQueue.
-public protocol NextLevelVideoDelegate: AnyObject {
+@objc public protocol NextLevelVideoDelegate: AnyObject {
     
     // video zoom
     func nextLevel(_ nextLevel: NextLevel, didUpdateVideoZoomFactor videoZoomFactor: Float)
@@ -169,7 +169,7 @@ public protocol NextLevelVideoDelegate: AnyObject {
 // MARK: - NextLevelPhotoDelegate
 
 /// Photo delegate, provides updates on photo related capture functionality.
-public protocol NextLevelPhotoDelegate: AnyObject {
+@objc public protocol NextLevelPhotoDelegate: AnyObject {
     
     func nextLevel(_ nextLevel: NextLevel, willCapturePhotoWithConfiguration photoConfiguration: NextLevelPhotoConfiguration)
     func nextLevel(_ nextLevel: NextLevel, didCapturePhotoWithConfiguration photoConfiguration: NextLevelPhotoConfiguration)
@@ -187,7 +187,7 @@ public protocol NextLevelPhotoDelegate: AnyObject {
 
 #if USE_TRUE_DEPTH
 /// Depth data delegate, provides depth data updates
-public protocol NextLevelDepthDataDelegate: AnyObject {
+@objc public protocol NextLevelDepthDataDelegate: AnyObject {
     
     @available(iOS 11.0, *)
     func depthDataOutput(_ nextLevel: NextLevel, didOutput depthData: AVDepthData, timestamp: CMTime)
