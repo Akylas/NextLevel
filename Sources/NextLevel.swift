@@ -176,7 +176,7 @@ public typealias NextLevelTorchMode = AVCaptureDevice.TorchMode
 public let NextLevelErrorDomain = "NextLevelErrorDomain"
 
 /// Error types.
-public enum NextLevelError: Error, CustomStringConvertible {
+@objc public enum NextLevelError: Int, Error, CustomStringConvertible {
     case unknown
     case started
     case deviceNotAvailable
