@@ -33,7 +33,7 @@ import ARKit
 // MARK: - MediaTypeConfiguration
 
 /// NextLevelConfiguration, media capture configuration object
-public class NextLevelConfiguration {
+@objcMembers public class NextLevelConfiguration {
 
     // MARK: - types
     

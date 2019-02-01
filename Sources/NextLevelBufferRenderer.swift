@@ -33,7 +33,7 @@ import SceneKit
 
 /// NextLevelBufferRenderer, provides the ability to render/record SceneKit frames
 @available(iOS 11.0, *)
-public class NextLevelBufferRenderer {
+@objcMembers public class NextLevelBufferRenderer {
     
     // MARK: - properties
     
