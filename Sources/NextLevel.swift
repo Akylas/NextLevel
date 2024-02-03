@@ -1466,7 +1466,12 @@ extension NextLevel {
         }
 
         var didChangeOrientation = false
-		let currentOrientation = self.deviceDelegate?.nextLevelCurrentDeviceOrientation?() ?? AVCaptureVideoOrientation.avorientationFromUIDeviceOrientation(UIDevice.current.orientation)
+	var interfaceOrientation: UIInterfaceOrientation = .portrait
+        DispatchQueue.main.sync {
+          interfaceOrientation = UIApplication.shared.statusBarOrientation
+        }
+        let currentOrientation = AVCaptureVideoOrientation.avorientationFromUUIInterfaceOrientation(interfaceOrientation)
+	//let currentOrientation = self.deviceDelegate?.nextLevelCurrentDeviceOrientation?() ?? AVCaptureVideoOrientation.avorientationFromUIDeviceOrientation(UIDevice.current.orientation)
 
         if let videoOutput = self._videoOutput, let videoConnection = videoOutput.connection(with: AVMediaType.video) {
             if videoConnection.isVideoOrientationSupported && videoConnection.videoOrientation != currentOrientation {
