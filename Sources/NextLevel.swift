@@ -1336,11 +1336,12 @@ extension NextLevel {
         }
 
         var didChangeOrientation = false
-	var interfaceOrientation: UIInterfaceOrientation = .portrait
-        DispatchQueue.main.sync {
-          interfaceOrientation = UIApplication.shared.statusBarOrientation
-        }
-        let currentOrientation = AVCaptureVideoOrientation.avorientationFromUUIInterfaceOrientation(interfaceOrientation)
+	//var interfaceOrientation: UIInterfaceOrientation = .portrait
+        //DispatchQueue.main.sync {
+        //  interfaceOrientation = UIApplication.shared.statusBarOrientation
+        //}
+	let currentOrientation = self.deviceOrientation
+        //let currentOrientation = AVCaptureVideoOrientation.avorientationFromUUIInterfaceOrientation(interfaceOrientation)
 	//let currentOrientation = self.deviceDelegate?.nextLevelCurrentDeviceOrientation?() ?? AVCaptureVideoOrientation.avorientationFromUIDeviceOrientation(UIDevice.current.orientation)
 
         if let previewConnection = self.previewLayer.connection {
@@ -3101,9 +3102,13 @@ extension NextLevel {
 
     @objc internal func deviceOrientationDidChange(_ notification: NSNotification) {
         if self.automaticallyUpdatesDeviceOrientation {
-            self._sessionQueue.sync {
-                self.updateVideoOrientation()
-            }
+		// we get orientation from statusbar to ensure we follow app orientation and not device
+		self.deviceOrientation = AVCaptureVideoOrientation.avorientationFromUUIInterfaceOrientation(UIApplication.shared.statusBarOrientation)
+            //self._sessionQueue.sync {
+            //    self.updateVideoOrientation()
+            //}
+	// will be reset by deviceOrientation setter
+          self.automaticallyUpdatesDeviceOrientation = true
         }
     }
 }
