@@ -2291,7 +2291,7 @@ extension NextLevel {
     /// Checks if video capture is supported by the hardware.
     public var isVideoCaptureSupported: Bool {
         get {
-            let deviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera,
+            var deviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera,
                                                              .builtInTelephotoCamera,
                                                              .builtInDualCamera,
                                                              .builtInTrueDepthCamera]
