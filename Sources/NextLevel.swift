@@ -81,11 +81,23 @@ public enum NextLevelDeviceType: Int, CustomStringConvertible {
             return AVCaptureDevice.DeviceType.builtInTrueDepthCamera
             #endif
         case .dualWideCamera:
-            return AVCaptureDevice.DeviceType.builtInDualWideCamera
+            if #available(iOS 13.0, *) {
+                return AVCaptureDevice.DeviceType.builtInDualWideCamera
+            } else {
+                return AVCaptureDevice.DeviceType(rawValue: "Unavailable")
+            }
         case .ultraWideAngleCamera:
-            return AVCaptureDevice.DeviceType.builtInUltraWideCamera
+            if #available(iOS 13.0, *) {
+                return AVCaptureDevice.DeviceType.builtInUltraWideCamera
+            } else {
+                return AVCaptureDevice.DeviceType(rawValue: "Unavailable")
+            }
         case .tripleCamera:
-            return AVCaptureDevice.DeviceType.builtInTripleCamera
+            if #available(iOS 13.0, *) {
+                return AVCaptureDevice.DeviceType.builtInTripleCamera
+            } else {
+                return AVCaptureDevice.DeviceType(rawValue: "Unavailable")
+            }
         }
     }
 
@@ -2282,13 +2294,14 @@ extension NextLevel {
             let deviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera,
                                                              .builtInTelephotoCamera,
                                                              .builtInDualCamera,
-                                                             .builtInTrueDepthCamera,
-                                                             .builtInUltraWideCamera,
-                                                             .builtInDualWideCamera,
-                                                             .builtInTripleCamera]
-//            if #available(iOS 15.4, *) {
+                                                             .builtInTrueDepthCamera]
+            if #available(iOS 13.0, *) {
+                deviceTypes.append(contentsOf: [.builtInUltraWideCamera, .builtInDualWideCamera, .builtInTripleCamera])
+            }
+            // if #available(iOS 15.4, *) {
 //                deviceTypes.append(contentsOf: [.builtInLiDARDepthCamera])
 //            }
+
             let discoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: deviceTypes, mediaType: AVMediaType.video, position: .unspecified)
             return discoverySession.devices.count > 0
         }
