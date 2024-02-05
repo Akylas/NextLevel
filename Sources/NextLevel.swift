@@ -1487,7 +1487,10 @@ extension NextLevel {
                 else {
                     return
             }
-
+            // ensure self._photoOutput is set
+            if (self._photoOutput == nil) {
+                self.addPhotoOutput()
+            }
             if let output = self._photoOutput {
                 if self.photoConfiguration.flashMode != newValue {
                     // iOS 11 GM fix
