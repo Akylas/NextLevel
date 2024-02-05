@@ -1520,7 +1520,7 @@ extension NextLevel {
             return .off
         }
         set {
-            self.executeClosureAsyncOnSessionQueueIfNecessary {
+            // self.executeClosureAsyncOnSessionQueueIfNecessary {
                 guard let device = self._currentDevice,
                     device.hasTorch,
                     device.torchMode != newValue
@@ -1537,7 +1537,7 @@ extension NextLevel {
                 } catch {
                     print("NextLevel, torchMode failed to lock device for configuration")
                 }
-            }
+            // }
         }
     }
 }
