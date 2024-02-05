@@ -424,8 +424,17 @@ public class NextLevelPhotoConfiguration: NextLevelConfiguration {
     /// Enabled high resolution capture
     public var isHighResolutionEnabled: Bool = false
 
-	/// Photo quality prioritization
-	public var photoQualityPrioritization: AVCapturePhotoOutput.QualityPrioritization = .balanced
+    private var _photoQualityPrioritization: Any? = nil 
+    /// Photo quality prioritization
+    @available(iOS 13, *)
+    public var photoQualityPrioritization: AVCapturePhotoOutput.QualityPrioritization {
+        get {
+          return _photoQualityPrioritization as? AVCapturePhotoOutput.QualityPrioritization ?? AVCapturePhotoOutput.QualityPrioritization.balanced
+        }
+        set {
+            _photoQualityPrioritization = newValue
+        }
+    }
 
     /// Enabled depth data capture with photo
     #if USE_TRUE_DEPTH

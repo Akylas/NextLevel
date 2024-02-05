@@ -2345,7 +2345,8 @@ extension NextLevel {
 	/// Fetch threshold value where a device of the specified type might be chosen when zooming in using a composite camera.
 	///
 	/// - Returns: Zoom threshold  or nil
-	public func switchOverVideoZoomFactorForDeviceType(_ deviceType: AVCaptureDevice.DeviceType) -> Float? {
+  @available(iOS 13.0, *)
+  public func switchOverVideoZoomFactorForDeviceType(_ deviceType: AVCaptureDevice.DeviceType) -> Float? {
 		guard let device = _currentDevice,
 			  let index = device.constituentDevices.firstIndex(where: { $0.deviceType == deviceType }) else {
 			return nil
@@ -2570,8 +2571,10 @@ extension NextLevel {
             photoSettings.isHighResolutionPhotoEnabled = self.photoConfiguration.isHighResolutionEnabled
             photoOutput.isHighResolutionCaptureEnabled = self.photoConfiguration.isHighResolutionEnabled
 
-			photoSettings.photoQualityPrioritization = photoConfiguration.photoQualityPrioritization
-			photoOutput.maxPhotoQualityPrioritization = photoConfiguration.photoQualityPrioritization
+            if #available(iOS 13.0, *) {
+                photoSettings.photoQualityPrioritization = photoConfiguration.photoQualityPrioritization
+                photoOutput.maxPhotoQualityPrioritization = photoConfiguration.photoQualityPrioritization
+            }
 
             #if USE_TRUE_DEPTH
             if photoOutput.isDepthDataDeliverySupported {
