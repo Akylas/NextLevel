@@ -135,6 +135,7 @@ public enum NextLevelCaptureMode: Int, CustomStringConvertible {
     case photo
     case audio
     case videoWithoutAudio
+    case videoPhotoWithoutAudio
     case movie
     case arKit
     case arKitWithoutAudio
@@ -146,6 +147,8 @@ public enum NextLevelCaptureMode: Int, CustomStringConvertible {
                 return "Video"
             case .videoWithoutAudio:
                 return "Video without audio"
+            case .videoPhotoWithoutAudio:
+                return "Video or Photo without audio"
             case .photo:
                 return "Photo"
             case .audio:
@@ -286,7 +289,7 @@ public class NextLevel: NSObject {
     // camera configuration
 
     /// The current capture mode of the device.
-    public var captureMode: NextLevelCaptureMode = .video {
+    public var captureMode: NextLevelCaptureMode = .photo {
         didSet {
             guard
                 self.captureMode != oldValue
@@ -570,6 +573,8 @@ extension NextLevel {
         case .audio:
             return NextLevel.authorizationStatus(forMediaType: AVMediaType.audio)
         case .videoWithoutAudio:
+          fallthrough
+        case .videoPhotoWithoutAudio:
             return NextLevel.authorizationStatus(forMediaType: AVMediaType.video)
         case .arKit:
             let audioStatus = NextLevel.authorizationStatus(forMediaType: AVMediaType.audio)
@@ -767,6 +772,8 @@ extension NextLevel {
             shouldConfigureVideo = true
             shouldConfigureAudio = true
             break
+        case .videoPhotoWithoutAudio:
+          fallthrough
         case .videoWithoutAudio:
             shouldConfigureVideo = true
             break
@@ -863,6 +870,23 @@ extension NextLevel {
             if self.captureMode == .video {
                 _ = self.addAudioOuput()
             }
+            _ = self.addVideoOutput()
+            #if USE_TRUE_DEPTH
+            if self.depthDataCaptureEnabled {
+                _ = self.addDepthDataOutput()
+            }
+            #endif
+            break
+        case .videoPhotoWithoutAudio:
+            if session.sessionPreset != self.photoConfiguration.preset {
+                if session.canSetSessionPreset(self.photoConfiguration.preset) {
+                    session.sessionPreset = self.photoConfiguration.preset
+                } else {
+                    print("NextLevel, could not set preset on session")
+                }
+            }
+
+            _ = self.addPhotoOutput()
             _ = self.addVideoOutput()
             #if USE_TRUE_DEPTH
             if self.depthDataCaptureEnabled {
@@ -1233,6 +1257,12 @@ extension NextLevel {
                 self._metadataOutput = nil
             }
             break
+        case .videoPhotoWithoutAudio:
+          if let audioOutput = self._audioOutput, session.outputs.contains(audioOutput) {
+              session.removeOutput(audioOutput)
+              self._audioOutput = nil
+          }
+          break;
         case .audio:
             if let videoOutput = self._videoOutput, session.outputs.contains(videoOutput) {
                 session.removeOutput(videoOutput)
@@ -2815,7 +2845,7 @@ extension NextLevel {
 extension NextLevel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
 
     public func captureOutput(_ captureOutput: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        if (self.captureMode == .videoWithoutAudio ||  self.captureMode == .arKitWithoutAudio) &&
+        if (self.captureMode == .videoWithoutAudio ||  self.captureMode == .videoPhotoWithoutAudio ||  self.captureMode == .arKitWithoutAudio) &&
             captureOutput == self._videoOutput {
             self.videoDelegate?.nextLevel(self, willProcessRawVideoSampleBuffer: sampleBuffer, onQueue: self._sessionQueue)
             self._lastVideoFrame = sampleBuffer
