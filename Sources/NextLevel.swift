@@ -2556,6 +2556,9 @@ extension NextLevel {
 
     /// Triggers a photo capture.
     public func capturePhoto() {
+        if ((self._photoOutput == nil)) {
+            self.addPhotoOutput()
+        }
         guard let photoOutput = self._photoOutput, let _ = photoOutput.connection(with: AVMediaType.video) else {
             return
         }
