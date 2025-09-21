@@ -1468,7 +1468,20 @@ extension NextLevel {
 // MARK: - flash and torch
 
 extension NextLevel {
-
+	
+    public var minVideoZoomFactor: Float {
+        if let device = self._currentDevice {
+            return device.minAvailableVideoZoomFactor
+        }
+        return 1.0
+    }
+    public var maxVideoZoomFactor: Float {
+        if let device = self._currentDevice {
+            return device.maxAvailableVideoZoomFactor
+        }
+        return 1.0
+    }
+	
     /// Checks if a flash is available.
     public var isFlashAvailable: Bool {
         if let device: AVCaptureDevice = self._currentDevice {
