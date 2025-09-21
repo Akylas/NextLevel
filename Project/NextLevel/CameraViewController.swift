@@ -359,19 +359,21 @@ extension CameraViewController {
                             assetCollectionChangeRequest?.addAssets(enumeration)
                         }
                     }, completionHandler: { (success2: Bool, _: Error?) in
-                    if success2 == true {
-                        // prompt that the video has been saved
-                        let alertController = UIAlertController(title: "Video Saved!", message: "Saved to the camera roll.", preferredStyle: .alert)
-                        let okAction = UIAlertAction(title: "OK", style: .default, handler: nil)
-                        alertController.addAction(okAction)
-                        self.present(alertController, animated: true, completion: nil)
-                    } else {
-                        // prompt that the video has been saved
-                        let alertController = UIAlertController(title: "Oops!", message: "Something failed!", preferredStyle: .alert)
-                        let okAction = UIAlertAction(title: "OK", style: .default, handler: nil)
-                        alertController.addAction(okAction)
-                        self.present(alertController, animated: true, completion: nil)
-                    }
+                        DispatchQueue.main.async { [weak self] in
+                            if success2 == true {
+                                // prompt that the video has been saved
+                                let alertController = UIAlertController(title: "Video Saved!", message: "Saved to the camera roll.", preferredStyle: .alert)
+                                let okAction = UIAlertAction(title: "OK", style: .default, handler: nil)
+                                alertController.addAction(okAction)
+                                self?.present(alertController, animated: true, completion: nil)
+                            } else {
+                                // prompt that the video has been saved
+                                let alertController = UIAlertController(title: "Oops!", message: "Something failed!", preferredStyle: .alert)
+                                let okAction = UIAlertAction(title: "OK", style: .default, handler: nil)
+                                alertController.addAction(okAction)
+                                self?.present(alertController, animated: true, completion: nil)
+                            }
+                        }
                 })
             }
         })
