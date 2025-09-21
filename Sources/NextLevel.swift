@@ -1471,13 +1471,13 @@ extension NextLevel {
 	
     public var minVideoZoomFactor: Float {
         if let device = self._currentDevice {
-            return device.minAvailableVideoZoomFactor
+            return Float(device.minAvailableVideoZoomFactor)
         }
         return 1.0
     }
     public var maxVideoZoomFactor: Float {
         if let device = self._currentDevice {
-            return device.maxAvailableVideoZoomFactor
+            return Float(device.maxAvailableVideoZoomFactor)
         }
         return 1.0
     }
@@ -2359,12 +2359,16 @@ extension NextLevel {
 	///
 	/// - Returns: Zoom threshold  or nil
 	public func switchOverVideoZoomFactorForDeviceType(_ deviceType: AVCaptureDevice.DeviceType) -> Float? {
-		guard let device = _currentDevice,
-			  let index = device.constituentDevices.firstIndex(where: { $0.deviceType == deviceType }) else {
-			return nil
-		}
+        if #available(iOS 13.0, *) {
+            guard let device = _currentDevice,
+                  let index = device.constituentDevices.firstIndex(where: { $0.deviceType == deviceType }) else {
+                return nil
+            }
 
-		return index > 0 ? device.virtualDeviceSwitchOverVideoZoomFactors[index - 1].floatValue : Float(device.minAvailableVideoZoomFactor)
+            return index > 0 ? device.virtualDeviceSwitchOverVideoZoomFactors[index - 1].floatValue : Float(device.minAvailableVideoZoomFactor)
+        } else {
+            return nil
+        }
 	}
 
     /// Triggers a photo capture from the last video frame.
@@ -2582,10 +2586,12 @@ extension NextLevel {
             let photoSettings = AVCapturePhotoSettings(format: formatDictionary)
             photoSettings.isHighResolutionPhotoEnabled = self.photoConfiguration.isHighResolutionEnabled
             photoOutput.isHighResolutionCaptureEnabled = self.photoConfiguration.isHighResolutionEnabled
-
-			photoSettings.photoQualityPrioritization = photoConfiguration.photoQualityPrioritization
-			photoOutput.maxPhotoQualityPrioritization = photoConfiguration.photoQualityPrioritization
-
+            
+            if #available(iOS 13.0, *) {
+                let photoQualityPrioritization = AVCapturePhotoOutput.QualityPrioritization.init(rawValue: photoConfiguration.photoQualityPrioritization) ?? AVCapturePhotoOutput.QualityPrioritization.balanced
+                photoSettings.photoQualityPrioritization = photoQualityPrioritization
+                photoOutput.maxPhotoQualityPrioritization = photoQualityPrioritization
+            }
             #if USE_TRUE_DEPTH
             if photoOutput.isDepthDataDeliverySupported {
                 photoOutput.isDepthDataDeliveryEnabled = self.photoConfiguration.isDepthDataEnabled
