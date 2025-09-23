@@ -1468,20 +1468,7 @@ extension NextLevel {
 // MARK: - flash and torch
 
 extension NextLevel {
-	
-    public var minVideoZoomFactor: Float {
-        if let device = self._currentDevice {
-            return device.minAvailableVideoZoomFactor
-        }
-        return 1.0
-    }
-    public var maxVideoZoomFactor: Float {
-        if let device = self._currentDevice {
-            return device.maxAvailableVideoZoomFactor
-        }
-        return 1.0
-    }
-	
+
     /// Checks if a flash is available.
     public var isFlashAvailable: Bool {
         if let device: AVCaptureDevice = self._currentDevice {
@@ -2353,18 +2340,39 @@ extension NextLevel {
             }
         }
     }
+    
+    public var minVideoZoomFactor: Float {
+        if let device = self._currentDevice {
+            return Float(device.minAvailableVideoZoomFactor)
+        }
+        return 1.0
+    }
+    public var maxVideoZoomFactor: Float {
+        if let device = self._currentDevice {
+            return Float(device.activeFormat.videoMaxZoomFactor)
+        }
+        return 1.0
+    }
+    
+    public var defaultZoomFactor: Float {
+        return switchOverVideoZoomFactorForDeviceType(.builtInWideAngleCamera)
+    }
 
 	//
 	/// Fetch threshold value where a device of the specified type might be chosen when zooming in using a composite camera.
 	///
 	/// - Returns: Zoom threshold  or nil
-	public func switchOverVideoZoomFactorForDeviceType(_ deviceType: AVCaptureDevice.DeviceType) -> Float? {
-		guard let device = _currentDevice,
-			  let index = device.constituentDevices.firstIndex(where: { $0.deviceType == deviceType }) else {
-			return nil
-		}
+	public func switchOverVideoZoomFactorForDeviceType(_ deviceType: AVCaptureDevice.DeviceType) -> Float {
+        if #available(iOS 13.0, *) {
+            guard let device = _currentDevice,
+                  let index = device.constituentDevices.firstIndex(where: { $0.deviceType == deviceType }) else {
+                return 1.0
+            }
 
-		return index > 0 ? device.virtualDeviceSwitchOverVideoZoomFactors[index - 1].floatValue : Float(device.minAvailableVideoZoomFactor)
+            return index > 0 ? device.virtualDeviceSwitchOverVideoZoomFactors[index - 1].floatValue : Float(device.minAvailableVideoZoomFactor)
+        } else {
+            return 1.0
+        }
 	}
 
     /// Triggers a photo capture from the last video frame.
@@ -2582,10 +2590,12 @@ extension NextLevel {
             let photoSettings = AVCapturePhotoSettings(format: formatDictionary)
             photoSettings.isHighResolutionPhotoEnabled = self.photoConfiguration.isHighResolutionEnabled
             photoOutput.isHighResolutionCaptureEnabled = self.photoConfiguration.isHighResolutionEnabled
-
-			photoSettings.photoQualityPrioritization = photoConfiguration.photoQualityPrioritization
-			photoOutput.maxPhotoQualityPrioritization = photoConfiguration.photoQualityPrioritization
-
+            
+            if #available(iOS 13.0, *) {
+                let photoQualityPrioritization = AVCapturePhotoOutput.QualityPrioritization.init(rawValue: photoConfiguration.photoQualityPrioritization) ?? AVCapturePhotoOutput.QualityPrioritization.balanced
+                photoSettings.photoQualityPrioritization = photoQualityPrioritization
+                photoOutput.maxPhotoQualityPrioritization = photoQualityPrioritization
+            }
             #if USE_TRUE_DEPTH
             if photoOutput.isDepthDataDeliverySupported {
                 photoOutput.isDepthDataDeliveryEnabled = self.photoConfiguration.isDepthDataEnabled

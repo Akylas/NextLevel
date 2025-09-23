@@ -425,7 +425,7 @@ public class NextLevelPhotoConfiguration: NextLevelConfiguration {
     public var isHighResolutionEnabled: Bool = false
 
 	/// Photo quality prioritization
-	public var photoQualityPrioritization: AVCapturePhotoOutput.QualityPrioritization = .balanced
+    public var photoQualityPrioritization: Int = 2 // AVCapturePhotoOutput.QualityPrioritization.balanced
 
     /// Enabled depth data capture with photo
     #if USE_TRUE_DEPTH
@@ -446,6 +446,9 @@ public class NextLevelPhotoConfiguration: NextLevelConfiguration {
 
     override init() {
         super.init()
+//        if #available(iOS 13.0, *) {
+//            photoQualityPrioritization = (AVCapturePhotoOutput.QualityPrioritization.balanced).rawValue
+//        }
     }
 
     // MARK: - funcs
