@@ -1468,20 +1468,7 @@ extension NextLevel {
 // MARK: - flash and torch
 
 extension NextLevel {
-	
-    public var minVideoZoomFactor: Float {
-        if let device = self._currentDevice {
-            return Float(device.minAvailableVideoZoomFactor)
-        }
-        return 1.0
-    }
-    public var maxVideoZoomFactor: Float {
-        if let device = self._currentDevice {
-            return Float(device.maxAvailableVideoZoomFactor)
-        }
-        return 1.0
-    }
-	
+
     /// Checks if a flash is available.
     public var isFlashAvailable: Bool {
         if let device: AVCaptureDevice = self._currentDevice {
@@ -2353,21 +2340,38 @@ extension NextLevel {
             }
         }
     }
+    
+    public var minVideoZoomFactor: Float {
+        if let device = self._currentDevice {
+            return Float(device.minAvailableVideoZoomFactor)
+        }
+        return 1.0
+    }
+    public var maxVideoZoomFactor: Float {
+        if let device = self._currentDevice {
+            return Float(device.activeFormat.videoMaxZoomFactor)
+        }
+        return 1.0
+    }
+    
+    public var defaultZoomFactor: Float {
+        return switchOverVideoZoomFactorForDeviceType(.builtInWideAngleCamera)
+    }
 
 	//
 	/// Fetch threshold value where a device of the specified type might be chosen when zooming in using a composite camera.
 	///
 	/// - Returns: Zoom threshold  or nil
-	public func switchOverVideoZoomFactorForDeviceType(_ deviceType: AVCaptureDevice.DeviceType) -> Float? {
+	public func switchOverVideoZoomFactorForDeviceType(_ deviceType: AVCaptureDevice.DeviceType) -> Float {
         if #available(iOS 13.0, *) {
             guard let device = _currentDevice,
                   let index = device.constituentDevices.firstIndex(where: { $0.deviceType == deviceType }) else {
-                return nil
+                return 1.0
             }
 
             return index > 0 ? device.virtualDeviceSwitchOverVideoZoomFactors[index - 1].floatValue : Float(device.minAvailableVideoZoomFactor)
         } else {
-            return nil
+            return 1.0
         }
 	}
 
