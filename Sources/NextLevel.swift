@@ -2899,11 +2899,11 @@ extension NextLevel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudi
         
         
 #if targetEnvironment(simulator)
-        if (self.previewLayer.previewModel != nil) {
+        if #available(iOS 13.0, *) {
             guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
             // Push frame to the preview view.
             // display(pixelBuffer:) is nonisolated and dispatches to @MainActor internally.
-            self.previewLayer.previewModel!.display(pixelBuffer: pixelBuffer)
+           (self.previewLayer.previewModel as? SimulatorCameraPreviewModel)!.display(pixelBuffer: pixelBuffer)
         }
 #endif
         if (self.captureMode == .videoWithoutAudio ||  self.captureMode == .arKitWithoutAudio) &&

@@ -91,9 +91,12 @@ public final class NextLevelPreviewLayer: CALayer {
     }()
 
     /// Model that manages subscription and enqueues frames to displayLayer.
-    private let previewModel: SimulatorCameraPreviewModel = {
-        let m = SimulatorCameraPreviewModel()
-        return m
+    public private(set) lazy var previewModel: Any? = {
+        if #available(iOS 13, *) {
+            return SimulatorCameraPreviewModel()
+        } else {
+            return nil
+        }
     }()
     #endif
 
@@ -112,7 +115,9 @@ public final class NextLevelPreviewLayer: CALayer {
     private func commonInit() {
         #if targetEnvironment(simulator)
         self.addSublayer(displayLayer)
-        previewModel.setDisplayLayer(displayLayer)
+        if #available(iOS 13.0, *) {
+            (previewModel as? SimulatorCameraPreviewModel)?.setDisplayLayer(displayLayer)
+        }
         #else
         if let p = devicePreview {
             self.addSublayer(p)
@@ -122,7 +127,9 @@ public final class NextLevelPreviewLayer: CALayer {
 
     deinit {
         #if targetEnvironment(simulator)
-        previewModel.setDisplayLayer(nil)
+        if #available(iOS 13.0, *) {
+            (previewModel as? SimulatorCameraPreviewModel)?.setDisplayLayer(nil)
+        }
         #endif
     }
 
