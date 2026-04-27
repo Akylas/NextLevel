@@ -39,7 +39,9 @@ let package = Package(
     targets: [
       .target(
           name: "NextLevel",
-          dependencies: ["SimulatorCameraClient"],
+          dependencies: [
+            .product(name: "SimulatorCameraClient", package: "SimulatorCamera")
+          ],
           path: "Sources",
           swiftSettings: [
               .enableUpcomingFeature("StrictConcurrency"),
