@@ -39,8 +39,8 @@ let package = Package(
     targets: [
       .target(
           name: "NextLevel",
-          path: "Sources",
-          dependencies: ["SimulatorCameraClient"]
+          dependencies: ["SimulatorCameraClient"],
+          path: "Sources"
       )
     ],
     swiftLanguageVersions: [.v5]
