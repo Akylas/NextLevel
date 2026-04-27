@@ -28,10 +28,13 @@ import PackageDescription
 let package = Package(
     name: "NextLevel",
     platforms: [
-      .iOS(.v16)
+      .iOS(.v12)
     ],
     products: [
       .library(name: "NextLevel", targets: ["NextLevel"])
+    ],
+     dependencies: [
+          .package(url: "https://github.com/farfromrefug/SimulatorCamera", from: "1.0.0")
     ],
     targets: [
       .target(
@@ -40,7 +43,8 @@ let package = Package(
           swiftSettings: [
               .enableUpcomingFeature("StrictConcurrency"),
               .enableUpcomingFeature("ExistentialAny")
-          ]
+          ],
+          dependencies: ["SimulatorCameraClient"]
       )
     ],
     swiftLanguageModes: [.version("6")]

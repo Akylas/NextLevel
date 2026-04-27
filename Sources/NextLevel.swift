@@ -35,6 +35,10 @@ import OSLog
 import ARKit
 #endif
 
+#if targetEnvironment(simulator)
+import SimulatorCameraClient
+#endif
+
 // MARK: - Sendable Wrappers
 
 /// Sendable wrapper for CVPixelBuffer/CVImageBuffer to allow capture in @Sendable closures
@@ -337,7 +341,7 @@ public class NextLevel: NSObject, @unchecked Sendable {
     // MARK: - Preview
 
     /// Live camera preview, add as a sublayer to the UIView's primary layer.
-    public var previewLayer: AVCaptureVideoPreviewLayer
+    public var previewLayer: NextLevelPreviewLayer
 
     // MARK: - Configuration
 
@@ -468,6 +472,12 @@ public class NextLevel: NSObject, @unchecked Sendable {
                 return self._arRunning
             #endif
             default:
+                #if targetEnvironment(simulator)
+                // Simulator uses its own lightweight capture session; check it first
+                if let sim = self._simulatorCaptureSession, sim.isRunning {
+                    return true
+                }
+                #endif
                 if let session = self._captureSession {
                     return session.isRunning
                 }
@@ -523,15 +533,16 @@ public class NextLevel: NSObject, @unchecked Sendable {
 
     // AVFoundation
 
+    // Real device AVFoundation types (keep these as the canonical types)
     internal var _captureSession: AVCaptureSession?
-
     internal var _videoInput: AVCaptureDeviceInput?
     internal var _audioInput: AVCaptureDeviceInput?
     internal var _videoOutput: AVCaptureVideoDataOutput?
     internal var _audioOutput: AVCaptureAudioDataOutput?
     internal var _movieFileOutput: AVCaptureMovieFileOutput?
     internal var _photoOutput: AVCapturePhotoOutput?
-    #if USE_TRUE_DEPTH
+    
+#if USE_TRUE_DEPTH
     internal var _depthDataOutput: Any?
     internal var depthDataOutput: AVCaptureDepthDataOutput? {
         get {
@@ -546,6 +557,14 @@ public class NextLevel: NSObject, @unchecked Sendable {
 
     internal var _currentDevice: AVCaptureDevice?
     internal var _requestedDevice: AVCaptureDevice?
+
+    // Simulator-only helpers: keep simulator session references separate so we don't
+    // try to shoehorn Simulator types into AVCapture types (avoids massive rewrites)
+    #if targetEnvironment(simulator)
+    internal var _simulatorCaptureSession: SimulatorCaptureSession?
+    internal var _simulatorCameraSession: SimulatorCameraSession?
+    #endif
+
     internal var _observers = [NSKeyValueObservation]()
     internal var _captureOutputObservers = [NSKeyValueObservation]()
 
@@ -569,7 +588,7 @@ public class NextLevel: NSObject, @unchecked Sendable {
     // MARK: - object lifecycle
 
     override public init() {
-        self.previewLayer = AVCaptureVideoPreviewLayer()
+        self.previewLayer = NextLevelPreviewLayer()
         self.previewLayer.videoGravity = AVLayerVideoGravity.resizeAspectFill
 
         self._sessionQueue = DispatchQueue(label: NextLevelCaptureSessionQueueIdentifier, qos: .userInteractive, target: DispatchQueue.global())
@@ -738,6 +757,15 @@ extension NextLevel {
             }
         }
 
+        #if targetEnvironment(simulator)
+        // Tear down simulator-side plumbing
+        SimulatorCamera.stop()
+        if let simSession = self._simulatorCaptureSession {
+            simSession.stopRunning()
+            self._simulatorCaptureSession = nil
+        }
+        #endif
+
         #if USE_ARKIT
         if self.captureMode == .arKit || self.captureMode == .arKitWithoutAudio {
             self.executeClosureAsyncOnSessionQueueIfNecessary {
@@ -753,7 +781,22 @@ extension NextLevel {
         // Note: use nextLevelSessionDidStart to ensure a device and session are available for configuration or format changes
         self.executeClosureAsyncOnSessionQueueIfNecessary {
             // setup AV capture sesssion
+            #if targetEnvironment(simulator)
+            // For the simulator we don't try to substitute AVCaptureSession across the
+            // codebase. Instead we start the SimulatorCamera service and ensure a
+            // SimulatorCameraOutput is created later by addVideoOutput().
+            SimulatorCamera.configure(host: "127.0.0.1", port: 9876)
+            self._simulatorCaptureSession = SimulatorCaptureSession()
+            // ensure video output exists and is registered with the router
+            _ = self.addVideoOutput()
+            // start the SimulatorCamera network session
+            SimulatorCamera.start()
+            DispatchQueue.main.async {
+                self.delegate?.nextLevelSessionDidStart(self)
+            }
+            #else
             self._captureSession = AVCaptureSession()
+            
             self._sessionConfigurationCount = 0
 
             // setup NL recording session
@@ -761,18 +804,18 @@ extension NextLevel {
 
             if let session = self._captureSession {
                 session.automaticallyConfiguresApplicationAudioSession = self.automaticallyConfiguresApplicationAudioSession
-
+                
                 self.beginConfiguration()
                 self.previewLayer.session = session
-
+                
                 self.configureSession()
                 self.configureSessionDevices()
                 self.updateVideoOutputSettings()
                 self.configureMetadataObjects()
                 self.updateVideoOrientation()
-
+                
                 self.commitConfiguration()
-
+                
                 if session.isRunning == false {
                     self.delegate?.nextLevelSessionWillStart(self)
                     if #available(iOS 15.0, *) {
@@ -780,10 +823,12 @@ extension NextLevel {
                     }
                     session.startRunning()
                     self.previewDelegate?.nextLevelWillStartPreview(self)
-
+                    
                     // nextLevelSessionDidStart is called from AVFoundation
                 }
             }
+            #endif
+            
         }
     }
 
@@ -864,9 +909,17 @@ extension NextLevel {
     }
 
     internal func configureSessionDevices() {
-        guard let _ = self._captureSession else {
-            return
+        #if targetEnvironment(simulator)
+        // On simulator we do not have real AVCaptureDevices. Keep behavior minimal:
+        // notify delegates that configuration is available and return.
+        DispatchQueue.main.async {
+            self.delegate?.nextLevel(self, didUpdateVideoConfiguration: self.videoConfiguration)
+            self.delegate?.nextLevel(self, didUpdateAudioConfiguration: self.audioConfiguration)
         }
+        return
+        #else
+        guard let _ = self._captureSession else { return }
+        #endif
 
         self.beginConfiguration()
 
@@ -1147,11 +1200,14 @@ extension NextLevel {
     private func addVideoOutput() -> Bool {
 
         if self._videoOutput == nil {
+            #if targetEnvironment(simulator)
+            self._videoOutput = SimulatorCameraOutput()
+        #else
+
             self._videoOutput = AVCaptureVideoDataOutput()
             self._videoOutput?.alwaysDiscardsLateVideoFrames = false
 
             var videoSettings = [String(kCVPixelBufferPixelFormatTypeKey): Int(kCVPixelFormatType_32BGRA)]
-            #if !( targetEnvironment(simulator) )
                 if let formatTypes = self._videoOutput?.availableVideoPixelFormatTypes {
                     var supportsFullRange = false
                     var supportsVideoRange = false
@@ -1169,10 +1225,11 @@ extension NextLevel {
                         videoSettings[String(kCVPixelBufferPixelFormatTypeKey)] = Int(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
                     }
                 }
-            #endif
             self._videoOutput?.videoSettings = videoSettings
+            #endif
         }
 
+        #if !(targetEnvironment(simulator))
         if let session = self._captureSession, let videoOutput = self._videoOutput {
             if session.canAddOutput(videoOutput) {
                 session.addOutput(videoOutput)
@@ -1181,6 +1238,12 @@ extension NextLevel {
                 return true
             }
         }
+        #else
+        if let videoOutput = self._videoOutput {
+            videoOutput.setSampleBufferDelegate(self, queue: self._sessionQueue)
+            return true
+        }
+        #endif
         print("NextLevel, couldn't add video output to session")
         return false
 
@@ -1444,16 +1507,19 @@ extension NextLevel {
 
     /// Changes capture device if the desired device is available.
     public func changeCaptureDeviceIfAvailable(captureDevice: NextLevelDeviceType) throws {
-        let deviceForUse = AVCaptureDevice.captureDevice(withType: captureDevice.avfoundationType, forPosition: self.devicePosition)
-        if deviceForUse == nil {
+        #if targetEnvironment(simulator)
+        // Simulator has no real capture devices — ignore device switching.
+        return
+        #else
+        guard let deviceForUse = AVCaptureDevice.captureDevice(withType: captureDevice.avfoundationType, forPosition: self.devicePosition) else {
             throw NextLevelError.deviceNotAvailable
-        } else {
-            self.executeClosureAsyncOnSessionQueueIfNecessary {
-                self._requestedDevice = deviceForUse
-                self.configureSessionDevices()
-                self.updateVideoOrientation()
-            }
         }
+        self.executeClosureAsyncOnSessionQueueIfNecessary {
+            self._requestedDevice = deviceForUse
+            self.configureSessionDevices()
+            self.updateVideoOrientation()
+        }
+        #endif
     }
 
     internal func updateVideoOrientation() {
@@ -2500,6 +2566,8 @@ extension NextLevel {
 
                 // TODO append exif metadata
 
+
+
                 // add JPEG, thumbnail
 
                 if let photo = self.sharedCIContext?.uiimage(withPixelBuffer: customFrame) {
@@ -2536,7 +2604,7 @@ extension NextLevel {
                         photoDict?[NextLevelPhotoJPEGKey] = imageData
                         photoDict?[NextLevelPhotoCroppedJPEGKey] = croppedImageData
                     }
-                }
+                               }
 
             } else if let arFrame = self._lastARFrame {
 
@@ -2555,7 +2623,7 @@ extension NextLevel {
 
             // TODO, if photoDict?[NextLevelPhotoJPEGKey]
             // add explicit thumbnail
-            // let thumbnailData = AVCapturePhotoOutput.jpegPhotoDataRepresentation(forJPEGSampleBuffer: previewBuffer, previewPhotoSampleBuffer: nil)
+            // let thumbnailData = AVCapturePhotoOutput.jpegPhotoDataRepresentation(for: previewBuffer, previewPhotoSampleBuffer: nil)
             // if let tData = thumbnailData {
             //    photoDict[NextLevelPhotoThumbnailKey] = tData
             // }
@@ -3011,6 +3079,16 @@ extension NextLevel {
 extension NextLevel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
 
     public func captureOutput(_ captureOutput: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        
+        
+#if targetEnvironment(simulator)
+        if (self.previewLayer.previewModel != nil) {
+            guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+            // Push frame to the preview view.
+            // display(pixelBuffer:) is nonisolated and dispatches to @MainActor internally.
+            self.previewLayer.previewModel!.display(pixelBuffer: pixelBuffer)
+        }
+#endif
         if (self.captureMode == .videoWithoutAudio ||  self.captureMode == .arKitWithoutAudio) &&
             captureOutput == self._videoOutput {
             self.videoDelegate?.nextLevel(self, willProcessRawVideoSampleBuffer: sampleBuffer, onQueue: self._sessionQueue)
