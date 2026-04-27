@@ -39,12 +39,12 @@ let package = Package(
     targets: [
       .target(
           name: "NextLevel",
+          dependencies: ["SimulatorCameraClient"],
           path: "Sources",
           swiftSettings: [
               .enableUpcomingFeature("StrictConcurrency"),
               .enableUpcomingFeature("ExistentialAny")
-          ],
-          dependencies: ["SimulatorCameraClient"]
+          ]
       )
     ],
     swiftLanguageModes: [.version("6")]
