@@ -28,7 +28,7 @@ import PackageDescription
 let package = Package(
     name: "NextLevel",
     platforms: [
-      .iOS(.v13)
+      .iOS(.v12)
     ],
     products: [
       .library(name: "NextLevel", targets: ["NextLevel"])
@@ -39,7 +39,9 @@ let package = Package(
     targets: [
       .target(
           name: "NextLevel",
-          dependencies: ["SimulatorCameraClient"],
+          dependencies: [
+            .product(name: "SimulatorCameraClient", package: "SimulatorCamera")
+          ],
           path: "Sources"
       )
     ],
