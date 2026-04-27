@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name = 'NextLevel'
-  s.version = '0.16.4'
+  s.version = '0.16.5'
   s.license = 'MIT'
   s.summary = 'Rad Media Capture in Swift'
   s.homepage = 'https://github.com/nextlevel/NextLevel'
@@ -11,4 +11,6 @@ Pod::Spec.new do |s|
   s.source_files = 'Sources/*.swift'
   s.requires_arc = true
   s.swift_version = '5.0'
+
+  s.dependency 'farfromrefug/SimulatorCamera', '~> 1.0.0'
 end
