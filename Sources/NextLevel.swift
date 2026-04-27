@@ -465,7 +465,7 @@ public class NextLevel: NSObject {
     // MARK: - singleton
 
     /// Method for providing a NextLevel singleton. This isn't required for use.
-    public static let shared = NextLevel()
+    @objc public static let shared = NextLevel()
 
     // MARK: - object lifecycle
 
@@ -2308,7 +2308,7 @@ extension NextLevel {
     }
 
     /// Checks if video capture is available, based on available storage and supported hardware functionality.
-    public var canCaptureVideo: Bool {
+    @objc public var canCaptureVideo: Bool {
         get {
             self.isVideoCaptureSupported && (FileManager.availableStorageSpaceInBytes() > NextLevelRequiredMinimumStorageSpaceInBytes)
         }
@@ -2564,7 +2564,7 @@ extension NextLevel {
 extension NextLevel {
 
     /// Checks if a photo capture operation can be performed, based on available storage space and supported hardware functionality.
-    public var canCapturePhoto: Bool {
+    @objc public var canCapturePhoto: Bool {
         get {
             let canCapturePhoto: Bool = (self._captureSession?.isRunning == true)
             return canCapturePhoto && FileManager.availableStorageSpaceInBytes() > NextLevelRequiredMinimumStorageSpaceInBytes
