@@ -34,7 +34,7 @@ let package = Package(
       .library(name: "NextLevel", targets: ["NextLevel"])
     ],
      dependencies: [
-          .package(url: "https://github.com/farfromrefug/SimulatorCamera", from: "1.0.0")
+          .package(url: "https://github.com/Akylas/SimulatorCamera", from: "1.0.0")
     ],
     targets: [
       .target(
