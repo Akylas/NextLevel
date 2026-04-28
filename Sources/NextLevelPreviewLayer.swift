@@ -11,6 +11,10 @@ import SimulatorCameraClient
 /// - On simulator: uses AVSampleBufferDisplayLayer + SimulatorCameraPreviewModel
 ///   so previewLayer behaves like a normal preview for callers.
 public final class NextLevelPreviewLayer: CALayer {
+    
+    public override init(layer: Any) {
+        super.init(layer: layer)
+    }
 
     // MARK: Public API used by NextLevel (kept minimal)
 
