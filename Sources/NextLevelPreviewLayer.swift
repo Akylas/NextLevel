@@ -184,4 +184,11 @@ public final class NextLevelPreviewLayer: CALayer {
             #endif
         }
     }
+    
+    public func captureDevicePointConverted(fromLayerPoint point: CGPoint) -> CGPoint {
+#if !targetEnvironment(simulator)
+        return self.devicePreview?.captureDevicePointConverted(fromLayerPoint: point) ?? CGPointZero
+#endif
+        return CGPointZero
+    }
 }
