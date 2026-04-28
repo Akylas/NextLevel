@@ -2439,15 +2439,143 @@ extension NextLevel {
             return 1.0
         }
 	}
+    
+    /// Triggers a photo capture from the last video frame.
+    #if targetEnvironment(simulator)
+    @objcMembers
+    public final class SIMAVCapturePhoto: NSObject {
+
+       private var _imageData: Data?
+       private var _metadata: [String: Any]?
+
+       public init(imageData: Data? = nil, metadata: [String: Any]? = nil) {
+           self._imageData = imageData
+           self._metadata = metadata
+           super.init()
+       }
+
+       /// Accessor used by NextLevel path — keep the same key name used in the shim code.
+       public var metadata: [String : Any]  {
+           get { _metadata ?? [:] }
+           set { _metadata = newValue }
+       }
+
+       /// Accessor used by NextLevel path — keep the same key name used in the shim code.
+       public var imageData: Data? {
+           get { _imageData }
+           set { _imageData = newValue }
+       }
+
+       /// Return the synthesized JPEG bytes for consumers that call fileDataRepresentation()
+       public func fileDataRepresentation() -> Data? {
+           return _imageData
+       }
+   }
+    public func capturePhotoForSimulator() {
+
+        self.executeClosureAsyncOnSessionQueueIfNecessary {
+            guard self._lastVideoFrame != nil || self._lastARFrame != nil else {
+                return
+            }
+
+            // choose source buffer
+            var buffer: CVPixelBuffer?
+            if let videoFrame = self._lastVideoFrame,
+               let imageBuffer = CMSampleBufferGetImageBuffer(videoFrame) {
+                buffer = imageBuffer
+            } else if let arFrame = self._lastARFrame {
+                buffer = arFrame
+            }
+
+            // allow client custom rendering hook
+            if self.isVideoCustomContextRenderingEnabled {
+                if let buffer = buffer {
+                    if CVPixelBufferLockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0)) == kCVReturnSuccess {
+                        // only called from captureQueue, populates self._sessionVideoCustomContextImageBuffer
+                        self.videoDelegate?.nextLevel(self, renderToCustomContextWithImageBuffer: buffer, onQueue: self._sessionQueue)
+                        CVPixelBufferUnlockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0))
+                    }
+                }
+            }
+
+            // build photo dictionary (metadata, jpeg, cropped jpeg) similar to real-device path
+            var photoDict: [String: Any]?
+            let ratio = self.videoConfiguration.aspectRatio.ratio
+
+            if let customFrame = self._sessionVideoCustomContextImageBuffer {
+                if let photo = self.sharedCIContext?.uiimage(withPixelBuffer: customFrame) {
+                    let croppedPhoto = ratio != nil ? photo.nx_croppedImage(to: ratio!) : photo
+                    if let imageData = photo.jpegData(compressionQuality: 1),
+                       let croppedImageData = croppedPhoto.jpegData(compressionQuality: 1) {
+                        photoDict = [:]
+                        photoDict?[NextLevelPhotoJPEGKey] = imageData
+                        photoDict?[NextLevelPhotoCroppedJPEGKey] = croppedImageData
+                    }
+                }
+            } else if let videoFrame = self._lastVideoFrame {
+                // append EXIF-like metadata
+                videoFrame.append(metadataAdditions: NextLevel.tiffMetadata)
+                if let metadata = videoFrame.metadata() {
+                    if photoDict == nil { photoDict = [:] }
+                    photoDict?[NextLevelPhotoMetadataKey] = metadata
+                }
+
+                // produce JPEGs
+                if let photo = self.sharedCIContext?.uiimage(withSampleBuffer: videoFrame) {
+                    let croppedPhoto = ratio != nil ? photo.nx_croppedImage(to: ratio!) : photo
+                    if let imageData = photo.jpegData(compressionQuality: 1),
+                       let croppedImageData = croppedPhoto.jpegData(compressionQuality: 1) {
+                        if photoDict == nil { photoDict = [:] }
+                        photoDict?[NextLevelPhotoJPEGKey] = imageData
+                        photoDict?[NextLevelPhotoCroppedJPEGKey] = croppedImageData
+                    }
+                }
+            } else if let arFrame = self._lastARFrame {
+                if let photo = self.sharedCIContext?.uiimage(withPixelBuffer: arFrame),
+                   let imageData = photo.jpegData(compressionQuality: 1) {
+                    photoDict = [:]
+                    photoDict?[NextLevelPhotoJPEGKey] = imageData
+                }
+            }
+
+            DispatchQueue.main.async {
+                let simPhoto = SIMAVCapturePhoto()
+                // populate shim fields if available
+                if let data = photoDict?[NextLevelPhotoJPEGKey] as? Data {
+                    simPhoto.imageData = data
+                }
+                if let metadata = photoDict?[NextLevelPhotoMetadataKey] as? [String: Any] {
+                    simPhoto.metadata = metadata
+                }
+
+                // call the same delegate as the real AVCapturePhoto path
+                let photoAsAV = unsafeBitCast(simPhoto, to: AVCapturePhoto.self)
+                self.photoDelegate?.nextLevel(self, didFinishProcessingPhoto: photoAsAV, photoDict: photoDict!, photoConfiguration: self.photoConfiguration)
+
+                // notify capture finished
+                self.photoDelegate?.nextLevelDidCompletePhotoCapture(self)
+            }
+
+        }
+
+    }
+    #endif
 
     /// Triggers a photo capture from the last video frame.
     public func capturePhotoFromVideo() {
 
         self.executeClosureAsyncOnSessionQueueIfNecessary {
+            #if targetEnvironment(simulator)
+            guard self._lastVideoFrame != nil || self._lastARFrame != nil
+                else {
+                    return
+            }
+            #else
             guard self._recordingSession != nil
                 else {
                     return
             }
+            #endif
 
             var buffer: CVPixelBuffer?
             if let videoFrame = self._lastVideoFrame,
@@ -2633,16 +2761,24 @@ extension NextLevel {
     /// Checks if a photo capture operation can be performed, based on available storage space and supported hardware functionality.
     @objc public var canCapturePhoto: Bool {
         get {
+            #if targetEnvironment(simulator)
+            return FileManager.availableStorageSpaceInBytes() > NextLevelRequiredMinimumStorageSpaceInBytes
+            #else
             let canCapturePhoto: Bool = (self._captureSession?.isRunning == true)
             return canCapturePhoto && FileManager.availableStorageSpaceInBytes() > NextLevelRequiredMinimumStorageSpaceInBytes
+            #endif
         }
     }
 
     /// Triggers a photo capture.
     public func capturePhoto() {
+        #if targetEnvironment(simulator)
+        // Simulator: synthesize an AVCapturePhoto-like object from last video frame
+        return capturePhotoForSimulator()
+        #endif
         guard let photoOutput = self._photoOutput, let _ = photoOutput.connection(with: AVMediaType.video) else {
-            return
-        }
+             return
+         }
 
         if let formatDictionary = self.photoConfiguration.avcaptureDictionary() {
 
@@ -2898,14 +3034,27 @@ extension NextLevel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudi
     public func captureOutput(_ captureOutput: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         
         
-#if targetEnvironment(simulator)
+        #if targetEnvironment(simulator)
         if #available(iOS 13.0, *) {
             guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
             // Push frame to the preview view.
             // display(pixelBuffer:) is nonisolated and dispatches to @MainActor internally.
            (self.previewLayer.previewModel as? SimulatorCameraPreviewModel)!.display(pixelBuffer: pixelBuffer)
         }
-#endif
+        if let videoOutput = self._videoOutput{
+            switch captureOutput {
+            case videoOutput:
+                self.videoDelegate?.nextLevel(self, willProcessRawVideoSampleBuffer: sampleBuffer, onQueue: self._sessionQueue)
+                self._lastVideoFrame = sampleBuffer
+                if let session = self._recordingSession {
+                    self.handleVideoOutput(sampleBuffer: sampleBuffer, session: session)
+                }
+                break
+            default:
+                break
+            }
+        }
+        #else
         if (self.captureMode == .videoWithoutAudio ||  self.captureMode == .arKitWithoutAudio) &&
             captureOutput == self._videoOutput {
             self.videoDelegate?.nextLevel(self, willProcessRawVideoSampleBuffer: sampleBuffer, onQueue: self._sessionQueue)
@@ -2933,6 +3082,8 @@ extension NextLevel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudi
                 break
             }
         }
+        #endif
+    
     }
 
 }
