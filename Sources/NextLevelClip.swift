@@ -33,7 +33,7 @@ public let NextLevelClipFilenameKey = "NextLevelClipFilenameKey"
 public let NextLevelClipInfoDictKey = "NextLevelClipInfoDictKey"
 
 /// NextLevelClip, an object for managing a single media clip
-public class NextLevelClip {
+public class NextLevelClip: @unchecked Sendable {
 
     /// Unique identifier for a clip
     public var uuid: UUID {

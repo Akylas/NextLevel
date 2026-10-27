@@ -26,6 +26,7 @@
 import UIKit
 import Foundation
 import AVFoundation
+import OSLog
 #if USE_ARKIT
 import ARKit
 #endif
@@ -33,7 +34,7 @@ import ARKit
 // MARK: - MediaTypeConfiguration
 
 /// NextLevelConfiguration, media capture configuration object
-public class NextLevelConfiguration {
+public class NextLevelConfiguration: @unchecked Sendable {
 
     // MARK: - types
 
@@ -50,7 +51,7 @@ public class NextLevelConfiguration {
     /// - instagramStories: 9:16 Instagram stories
     /// - cinematic: 2.35:1 cinematic
     /// - custom: custom aspect ratio
-    public enum AspectRatio: CustomStringConvertible {
+    public enum AspectRatio: CustomStringConvertible, Sendable {
         case active
         case square
         case standard
@@ -179,7 +180,7 @@ public class NextLevelConfiguration {
 // MARK: - VideoConfiguration
 
 /// NextLevelVideoConfiguration, video capture configuration object
-public class NextLevelVideoConfiguration: NextLevelConfiguration {
+public class NextLevelVideoConfiguration: NextLevelConfiguration, @unchecked Sendable {
 
     // MARK: - types
 
@@ -334,7 +335,7 @@ public class NextLevelVideoConfiguration: NextLevelConfiguration {
 // MARK: - AudioConfiguration
 
 /// NextLevelAudioConfiguration, audio capture configuration object
-public class NextLevelAudioConfiguration: NextLevelConfiguration {
+public class NextLevelAudioConfiguration: NextLevelConfiguration, @unchecked Sendable {
 
     // MARK: - types
 
@@ -385,10 +386,36 @@ public class NextLevelAudioConfiguration: NextLevelConfiguration {
                 self.channelsCount = Int(streamBasicDescription.pointee.mChannelsPerFrame)
             }
 
+            // Extract audio channel layout safely to prevent crash from channel count mismatch
+            // Issues: #286, #271 - "AudioChannelLayout channel count does not match AVNumberOfChannelsKey channel count"
             var layoutSize: Int = 0
-            if let currentChannelLayout = CMAudioFormatDescriptionGetChannelLayout(formatDescription, sizeOut: &layoutSize) {
-                let currentChannelLayoutData = layoutSize > 0 ? Data(bytes: currentChannelLayout, count: layoutSize) : Data()
-                config[AVChannelLayoutKey] = currentChannelLayoutData
+            if let currentChannelLayout = CMAudioFormatDescriptionGetChannelLayout(formatDescription, sizeOut: &layoutSize),
+               layoutSize > 0 {
+                // Validate that the channel layout's channel count matches our configuration
+                var layoutChannelCount: UInt32 = 0
+
+                // Determine channel count from the layout
+                if currentChannelLayout.pointee.mChannelLayoutTag == kAudioChannelLayoutTag_UseChannelDescriptions {
+                    layoutChannelCount = currentChannelLayout.pointee.mNumberChannelDescriptions
+                } else if currentChannelLayout.pointee.mChannelLayoutTag != kAudioChannelLayoutTag_UseChannelBitmap {
+                    // For standard layouts, get channel count from the tag
+                    // Skip bitmap layouts as they require special handling
+                    layoutChannelCount = AudioChannelLayoutTag_GetNumberOfChannels(currentChannelLayout.pointee.mChannelLayoutTag)
+                }
+
+                // Only include the channel layout if:
+                // 1. We successfully determined the channel count (layoutChannelCount > 0)
+                // 2. It matches our declared channel count
+                let declaredChannelCount = self.channelsCount ?? NextLevelAudioConfiguration.AudioChannelsCountDefault
+                if layoutChannelCount > 0 && Int(layoutChannelCount) == declaredChannelCount {
+                    let currentChannelLayoutData = Data(bytes: currentChannelLayout, count: layoutSize)
+                    config[AVChannelLayoutKey] = currentChannelLayoutData
+                    Logger.audio.debug("Audio channel layout validated: \(layoutChannelCount) channels match declared \(declaredChannelCount)")
+                } else if layoutChannelCount > 0 {
+                    Logger.audio.warning("Audio channel layout mismatch: layout has \(layoutChannelCount) channels but declared \(declaredChannelCount) - omitting layout to prevent crash (Issues #286, #271)")
+                }
+                // If there's a mismatch or we can't determine the count, we intentionally omit AVChannelLayoutKey to prevent crashes
+                // AVAssetWriterInput will use a default layout based on AVNumberOfChannelsKey
             }
         }
 
@@ -413,7 +440,7 @@ public class NextLevelAudioConfiguration: NextLevelConfiguration {
 // MARK: - PhotoConfiguration
 
 /// NextLevelPhotoConfiguration, photo capture configuration object
-public class NextLevelPhotoConfiguration: NextLevelConfiguration {
+public class NextLevelPhotoConfiguration: NextLevelConfiguration, @unchecked Sendable {
 
     /// Codec used to encode photo, AV dictionary key AVVideoCodecKey
     public var codec: AVVideoCodecType = AVVideoCodecType.hevc
@@ -460,7 +487,11 @@ public class NextLevelPhotoConfiguration: NextLevelConfiguration {
         if let options = self.options {
             return options
         } else {
-            var config: [String: Any] = [AVVideoCodecKey: self.codec]
+            var config: [String: Any] = [:]
+
+            // Fix for Issue #280: kCVPixelBufferPixelFormatTypeKey and AVVideoCodecKey are mutually exclusive
+            // When generating preview/thumbnail, use pixel format type key
+            // Otherwise, use codec key for final photo output
             if self.generateThumbnail {
                 let settings = AVCapturePhotoSettings()
                 // iOS 11 GM fix
@@ -468,9 +499,15 @@ public class NextLevelPhotoConfiguration: NextLevelConfiguration {
                 if settings.__availablePreviewPhotoPixelFormatTypes.count > 0 {
                     if let formatType = settings.__availablePreviewPhotoPixelFormatTypes.first {
                         config[kCVPixelBufferPixelFormatTypeKey as String] = formatType
+                        Logger.photo.debug("Photo configuration using preview pixel format: \(formatType)")
                     }
                 }
+            } else {
+                // Only set codec when not generating preview/thumbnail
+                config[AVVideoCodecKey] = self.codec
+                Logger.photo.debug("Photo configuration using codec: \(self.codec.rawValue)")
             }
+
             return config
         }
     }
@@ -479,7 +516,7 @@ public class NextLevelPhotoConfiguration: NextLevelConfiguration {
 // MARK: - ARConfiguration
 
 /// NextLevelARConfiguration, augmented reality configuration object
-public class NextLevelARConfiguration: NextLevelConfiguration {
+public class NextLevelARConfiguration: NextLevelConfiguration, @unchecked Sendable {
 
     #if USE_ARKIT
     /// ARKit configuration

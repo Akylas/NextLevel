@@ -1,4 +1,4 @@
-// swift-tools-version:5.7
+// swift-tools-version:6.1
 //
 //  Package.swift
 //  NextLevel (http://nextlevel.engineering/)
@@ -28,22 +28,34 @@ import PackageDescription
 let package = Package(
     name: "NextLevel",
     platforms: [
-      .iOS(.v12)
+      .iOS(.v16)
     ],
     products: [
       .library(name: "NextLevel", targets: ["NextLevel"])
     ],
-     dependencies: [
-          .package(url: "https://github.com/Akylas/SimulatorCamera", from: "1.0.0")
+    traits: [
+      // Opt in with `traits: ["SimulatorCamera"]` to get a fake camera feed on the iOS Simulator.
+      .trait(name: "SimulatorCamera", description: "Simulator camera feed via SimulatorCamera")
+    ],
+    dependencies: [
+      .package(url: "https://github.com/Akylas/SimulatorCamera", from: "1.0.0")
     ],
     targets: [
       .target(
           name: "NextLevel",
           dependencies: [
-            .product(name: "SimulatorCameraClient", package: "SimulatorCamera")
+            .product(
+              name: "SimulatorCameraClient",
+              package: "SimulatorCamera",
+              condition: .when(traits: ["SimulatorCamera"]))
           ],
-          path: "Sources"
+          path: "Sources",
+          swiftSettings: [
+              .enableUpcomingFeature("StrictConcurrency"),
+              .enableUpcomingFeature("ExistentialAny"),
+              .define("SIMULATOR_CAMERA", .when(traits: ["SimulatorCamera"]))
+          ]
       )
     ],
-    swiftLanguageVersions: [.v5]
+    swiftLanguageModes: [.version("6")]
 )

@@ -1,8 +1,16 @@
 import Foundation
 import AVFoundation
 import UIKit
-#if targetEnvironment(simulator)
+#if SIMULATOR_CAMERA && targetEnvironment(simulator)
 import SimulatorCameraClient
+#endif
+
+#if SIMULATOR_CAMERA && targetEnvironment(simulator)
+/// Carries main-actor-created, non-Sendable objects out of `MainActor.assumeIsolated`.
+private struct UncheckedSendableBox<T>: @unchecked Sendable {
+    let value: T
+    init(_ value: T) { self.value = value }
+}
 #endif
 
 /// Cross-platform preview layer used by NextLevel.
@@ -21,14 +29,14 @@ public final class NextLevelPreviewLayer: CALayer {
     /// Matches AVCaptureVideoPreviewLayer.videoGravity
     public var videoGravity: AVLayerVideoGravity {
         get {
-            #if targetEnvironment(simulator)
+            #if SIMULATOR_CAMERA && targetEnvironment(simulator)
             return displayLayer.videoGravity
             #else
             return devicePreview?.videoGravity ?? .resizeAspect
             #endif
         }
         set {
-            #if targetEnvironment(simulator)
+            #if SIMULATOR_CAMERA && targetEnvironment(simulator)
             displayLayer.videoGravity = newValue
             #else
             devicePreview?.videoGravity = newValue
@@ -40,14 +48,14 @@ public final class NextLevelPreviewLayer: CALayer {
     /// Matches AVCaptureVideoPreviewLayer.session (setter attaches on device)
     public var session: AVCaptureSession? {
         get {
-            #if !targetEnvironment(simulator)
+            #if !(SIMULATOR_CAMERA && targetEnvironment(simulator))
             return devicePreview?.session
             #else
             return nil
             #endif
         }
         set {
-            #if !targetEnvironment(simulator)
+            #if !(SIMULATOR_CAMERA && targetEnvironment(simulator))
             devicePreview?.session = newValue
             #else
             // no-op on simulator
@@ -57,7 +65,7 @@ public final class NextLevelPreviewLayer: CALayer {
 
     /// Matches AVCaptureVideoPreviewLayer.connection
     public var connection: AVCaptureConnection? {
-        #if !targetEnvironment(simulator)
+        #if !(SIMULATOR_CAMERA && targetEnvironment(simulator))
         return devicePreview?.connection
         #else
         return nil
@@ -67,7 +75,7 @@ public final class NextLevelPreviewLayer: CALayer {
     /// Transforms metadata object coordinates into preview coordinates.
     /// On simulator returns the original object (no transform) if device API unavailable.
     public func transformedMetadataObject(for metadataObject: AVMetadataObject) -> AVMetadataObject? {
-        #if !targetEnvironment(simulator)
+        #if !(SIMULATOR_CAMERA && targetEnvironment(simulator))
         return devicePreview?.transformedMetadataObject(for: metadataObject)
         #else
         // Simulator preview is an AVSampleBufferDisplayLayer — no AVFoundation transform available.
@@ -77,7 +85,7 @@ public final class NextLevelPreviewLayer: CALayer {
     }
 
     // MARK: - Device backing (real device)
-    #if !targetEnvironment(simulator)
+    #if !(SIMULATOR_CAMERA && targetEnvironment(simulator))
     private lazy var devicePreview: AVCaptureVideoPreviewLayer? = {
         let p = AVCaptureVideoPreviewLayer()
         p.videoGravity = .resizeAspectFill
@@ -86,21 +94,17 @@ public final class NextLevelPreviewLayer: CALayer {
     #endif
 
     // MARK: - Simulator backing
-    #if targetEnvironment(simulator)
-    private let displayLayer: AVSampleBufferDisplayLayer = {
+    #if SIMULATOR_CAMERA && targetEnvironment(simulator)
+    private let displayLayer: AVSampleBufferDisplayLayer = MainActor.assumeIsolated {
         let l = AVSampleBufferDisplayLayer()
         l.videoGravity = .resizeAspectFill
         l.needsDisplayOnBoundsChange = true
-        return l
-    }()
+        return UncheckedSendableBox(l)
+    }.value
 
     /// Model that manages subscription and enqueues frames to displayLayer.
     public private(set) lazy var previewModel: Any? = {
-        if #available(iOS 13, *) {
-            return SimulatorCameraPreviewModel()
-        } else {
-            return nil
-        }
+        return MainActor.assumeIsolated { UncheckedSendableBox(SimulatorCameraPreviewModel()) }.value
     }()
     #endif
 
@@ -117,7 +121,7 @@ public final class NextLevelPreviewLayer: CALayer {
     }
 
     private func commonInit() {
-        #if targetEnvironment(simulator)
+        #if SIMULATOR_CAMERA && targetEnvironment(simulator)
         self.addSublayer(displayLayer)
         if #available(iOS 13.0, *) {
             (previewModel as? SimulatorCameraPreviewModel)?.setDisplayLayer(displayLayer)
@@ -130,7 +134,7 @@ public final class NextLevelPreviewLayer: CALayer {
     }
 
     deinit {
-        #if targetEnvironment(simulator)
+        #if SIMULATOR_CAMERA && targetEnvironment(simulator)
         if #available(iOS 13.0, *) {
             (previewModel as? SimulatorCameraPreviewModel)?.setDisplayLayer(nil)
         }
@@ -139,7 +143,7 @@ public final class NextLevelPreviewLayer: CALayer {
 
     public override func layoutSublayers() {
         super.layoutSublayers()
-        #if targetEnvironment(simulator)
+        #if SIMULATOR_CAMERA && targetEnvironment(simulator)
         displayLayer.frame = bounds
         #else
         devicePreview?.frame = bounds
@@ -148,7 +152,7 @@ public final class NextLevelPreviewLayer: CALayer {
 
     // Convenience: expose some mirroring helpers that NextLevel might expect via connection
     public var isVideoMirroringSupported: Bool {
-        #if !targetEnvironment(simulator)
+        #if !(SIMULATOR_CAMERA && targetEnvironment(simulator))
         return connection?.isVideoMirroringSupported ?? false
         #else
         return false
@@ -157,14 +161,14 @@ public final class NextLevelPreviewLayer: CALayer {
 
     public var isVideoMirrored: Bool {
         get {
-            #if !targetEnvironment(simulator)
+            #if !(SIMULATOR_CAMERA && targetEnvironment(simulator))
             return connection?.isVideoMirrored ?? false
             #else
             return false
             #endif
         }
         set {
-            #if !targetEnvironment(simulator)
+            #if !(SIMULATOR_CAMERA && targetEnvironment(simulator))
             if let conn = connection, conn.isVideoMirroringSupported {
                 conn.isVideoMirrored = newValue
             }
@@ -174,14 +178,14 @@ public final class NextLevelPreviewLayer: CALayer {
 
     public var automaticallyAdjustsVideoMirroring: Bool {
         get {
-            #if !targetEnvironment(simulator)
+            #if !(SIMULATOR_CAMERA && targetEnvironment(simulator))
             return connection?.automaticallyAdjustsVideoMirroring ?? false
             #else
             return false
             #endif
         }
         set {
-            #if !targetEnvironment(simulator)
+            #if !(SIMULATOR_CAMERA && targetEnvironment(simulator))
             if let conn = connection, conn.isVideoMirroringSupported {
                 conn.automaticallyAdjustsVideoMirroring = newValue
             }
@@ -190,7 +194,7 @@ public final class NextLevelPreviewLayer: CALayer {
     }
     
     public func captureDevicePointConverted(fromLayerPoint point: CGPoint) -> CGPoint {
-#if !targetEnvironment(simulator)
+#if !(SIMULATOR_CAMERA && targetEnvironment(simulator))
         return self.devicePreview?.captureDevicePointConverted(fromLayerPoint: point) ?? CGPointZero
 #endif
         return CGPointZero

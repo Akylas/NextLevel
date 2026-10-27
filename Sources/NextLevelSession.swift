@@ -25,11 +25,51 @@
 
 import Foundation
 import AVFoundation
+import OSLog
+
+// MARK: - Session State Types
+
+/// Atomic snapshot of session state for thread-safe multi-property checks
+public struct SessionState: Sendable {
+    public let isAudioSetup: Bool
+    public let isVideoSetup: Bool
+    public let currentClipHasStarted: Bool
+    public let currentClipHasVideo: Bool
+    public let currentClipHasAudio: Bool
+    public let isReady: Bool
+    public let isVideoReady: Bool
+    public let isAudioReady: Bool
+}
+
+/// Result of video append operation with first-frame detection
+public struct AppendVideoResult: Sendable {
+    public let success: Bool
+    public let wasFirstFrame: Bool
+}
+
+/// Result of audio append operation with first-frame detection
+public struct AppendAudioResult: Sendable {
+    public let success: Bool
+    public let wasFirstFrame: Bool
+}
 
 // MARK: - NextLevelSession
 
 /// NextLevelSession, a powerful object for managing and editing a set of recorded media clips.
-public class NextLevelSession {
+///
+/// This actor provides thread-safe access to recording session state and clip management.
+/// All public methods are async to ensure proper actor isolation.
+///
+/// ## Atomic Operations
+///
+/// The actor provides compound methods that perform check-and-act operations atomically
+/// to prevent race conditions that could occur with separate property reads and method calls.
+///
+/// Use these methods instead of checking properties separately:
+/// - `beginClipIfNeeded()` instead of `if !isReady { beginClip() }`
+/// - `setupVideoIfNeeded()` instead of `if !isVideoSetup { setupVideo() }`
+/// - `getState()` for atomic multi-property snapshots
+public actor NextLevelSession {
 
     /// Output directory for a session.
     public var outputDirectory: String
@@ -39,6 +79,12 @@ public class NextLevelSession {
 
     /// Output file extension for a session, see AVMediaFormat.h for supported extensions.
     public var fileExtension: String = "mp4"
+
+    /// When true, optimizes output files for network streaming (may increase finishWriting time for long videos).
+    /// When false, faster file writing but not optimized for network playback.
+    /// Default is true. Set to false if you only need local playback and want faster recording completion.
+    /// Issue #257: https://github.com/NextLevel/NextLevel/issues/257
+    public var shouldOptimizeForNetworkUse: Bool = true
 
     /// Unique identifier for a session.
     public var identifier: UUID {
@@ -93,10 +139,10 @@ public class NextLevelSession {
     }
 
     /// Recorded clips for the session.
+    ///
+    /// - Note: Access to this property is actor-isolated and thread-safe.
     public var clips: [NextLevelClip] {
-        get {
-            self._clips
-        }
+        self._clips
     }
 
     /// Duration of a session, the sum of all recorded clips.
@@ -142,19 +188,17 @@ public class NextLevelSession {
     }
 
     /// `AVAsset` of the session.
+    ///
+    /// - Note: This property is actor-isolated and automatically thread-safe.
     public var asset: AVAsset? {
         get {
-            var asset: AVAsset?
-            self.executeClosureSyncOnSessionQueueIfNecessary {
-                if self._clips.count == 1 {
-                    asset = self._clips.first?.asset
-                } else {
-                    let composition: AVMutableComposition = AVMutableComposition()
-                    self.appendClips(toComposition: composition)
-                    asset = composition
-                }
+            if self._clips.count == 1 {
+                return self._clips.first?.asset
+            } else {
+                let composition: AVMutableComposition = AVMutableComposition()
+                self.appendClips(toComposition: composition)
+                return composition
             }
-            return asset
         }
     }
 
@@ -182,9 +226,10 @@ public class NextLevelSession {
     internal var _videoConfiguration: NextLevelVideoConfiguration?
     internal var _audioConfiguration: NextLevelAudioConfiguration?
 
-    internal var _audioQueue: DispatchQueue
-    internal var _sessionQueue: DispatchQueue
-    internal var _sessionQueueKey: DispatchSpecificKey<()>
+    // Note: Dispatch queues removed - actor provides isolation
+    // internal var _audioQueue: DispatchQueue
+    // internal var _sessionQueue: DispatchQueue
+    // internal var _sessionQueueKey: DispatchSpecificKey<()>
 
     internal var _currentClipDuration: CMTime = .zero
     internal var _currentClipHasAudio: Bool = false
@@ -198,47 +243,163 @@ public class NextLevelSession {
 
     internal var _skippedAudioBuffers: [CMSampleBuffer] = []
 
-    private let NextLevelSessionAudioQueueIdentifier = "engineering.NextLevel.session.audioQueue"
-    private let NextLevelSessionQueueIdentifier = "engineering.NextLevel.sessionQueue"
-    private let NextLevelSessionSpecificKey = DispatchSpecificKey<()>()
-
     // MARK: - object lifecycle
 
-    /// Initialize using a specific dispatch queue.
+    /// Initializer for NextLevelSession actor.
     ///
-    /// - Parameters:
-    ///   - queue: Queue for a session operations
-    ///   - queueKey: Key for re-calling the session queue from the system
-    public convenience init(queue: DispatchQueue, queueKey: DispatchSpecificKey<()>) {
-        self.init()
-        self._sessionQueue = queue
-        self._sessionQueueKey = queueKey
-    }
-
-    /// Initializer.
+    /// The actor provides automatic thread-safe isolation, eliminating the need for dispatch queues.
     public init() {
         self._identifier = UUID()
         self._date = Date()
         self.outputDirectory = NSTemporaryDirectory()
+    }
 
-        self._audioQueue = DispatchQueue(label: NextLevelSessionAudioQueueIdentifier)
-
-        // should always use init(queue:queueKey:), but this may be good for the future
-        self._sessionQueue = DispatchQueue(label: NextLevelSessionQueueIdentifier)
-        self._sessionQueue.setSpecific(key: NextLevelSessionSpecificKey, value: ())
-        self._sessionQueueKey = NextLevelSessionSpecificKey
+    /// Legacy initializer for backward compatibility.
+    ///
+    /// - Parameters:
+    ///   - queue: Dispatch queue (ignored - actor provides isolation)
+    ///   - queueKey: Queue key (ignored - actor provides isolation)
+    ///
+    /// - Note: This initializer is maintained for API compatibility but dispatch queues
+    ///         are no longer used. The actor's built-in isolation replaces queue-based synchronization.
+    @available(*, deprecated, message: "Dispatch queues are no longer needed with actor isolation")
+    public init(queue: DispatchQueue, queueKey: DispatchSpecificKey<()>) {
+        // Initialize stored properties (queue parameters ignored - actor provides isolation)
+        self._identifier = UUID()
+        self._date = Date()
+        self.outputDirectory = NSTemporaryDirectory()
     }
 
     deinit {
-        self._writer = nil
+        // Actor properties are automatically released - no manual cleanup needed
+        // Cannot access actor-isolated properties from nonisolated deinit
+    }
+
+}
+
+// MARK: - Atomic Compound Operations
+
+extension NextLevelSession {
+
+    /// Returns an atomic snapshot of the current session state.
+    ///
+    /// Use this method when you need to check multiple properties together to avoid
+    /// race conditions from checking properties separately with multiple await calls.
+    ///
+    /// - Returns: Snapshot of current session state
+    public func getState() -> SessionState {
+        SessionState(
+            isAudioSetup: self._audioInput != nil,
+            isVideoSetup: self._videoInput != nil,
+            currentClipHasStarted: self._currentClipHasStarted,
+            currentClipHasVideo: self._currentClipHasVideo,
+            currentClipHasAudio: self._currentClipHasAudio,
+            isReady: self._writer != nil,
+            isVideoReady: self._videoInput?.isReadyForMoreMediaData ?? false,
+            isAudioReady: self._audioInput?.isReadyForMoreMediaData ?? false
+        )
+    }
+
+    /// Begins a clip only if the writer is not already initialized.
+    ///
+    /// This is an atomic check-and-act operation that prevents race conditions.
+    ///
+    /// - Returns: `true` if a clip was begun, `false` if already started
+    public func beginClipIfNeeded() -> Bool {
+        guard self._writer == nil else {
+            Logger.session.debug("Clip already started, skipping beginClip")
+            return false
+        }
+
+        self.setupWriter()
+        self._currentClipDuration = .zero
+        self._currentClipHasAudio = false
+        self._currentClipHasVideo = false
+        Logger.session.info("Began new clip")
+        return true
+    }
+
+    /// Sets up video if not already configured (atomic operation).
+    ///
+    /// - Parameters:
+    ///   - settings: AVFoundation video settings dictionary
+    ///   - configuration: Video configuration for video output
+    ///   - formatDescription: sample buffer format description
+    /// - Returns: `true` if setup succeeded or was already done, `false` on failure
+    public func setupVideoIfNeeded(
+        withSettings settings: [String: Any]?,
+        configuration: NextLevelVideoConfiguration,
+        formatDescription: CMFormatDescription? = nil
+    ) -> Bool {
+        guard self._videoInput == nil else {
+            return true // Already setup
+        }
+
+        let success = self.setupVideo(
+            withSettings: settings,
+            configuration: configuration,
+            formatDescription: formatDescription
+        )
+
+        if success {
+            Logger.video.info("Video setup completed")
+        } else {
+            Logger.video.error("Video setup failed")
+        }
+
+        return success
+    }
+
+    /// Sets up audio if not already configured (atomic operation).
+    ///
+    /// - Parameters:
+    ///   - settings: AVFoundation audio settings dictionary
+    ///   - configuration: Audio configuration for audio output
+    ///   - formatDescription: sample buffer format description
+    /// - Returns: `true` if setup succeeded or was already done, `false` on failure
+    public func setupAudioIfNeeded(
+        withSettings settings: [String: Any]?,
+        configuration: NextLevelAudioConfiguration,
+        formatDescription: CMFormatDescription
+    ) -> Bool {
+        guard self._audioInput == nil else {
+            return true // Already setup
+        }
+
+        let success = self.setupAudio(
+            withSettings: settings,
+            configuration: configuration,
+            formatDescription: formatDescription
+        )
+
+        if success {
+            Logger.audio.info("Audio setup completed")
+        } else {
+            Logger.audio.error("Audio setup failed")
+        }
+
+        return success
+    }
+
+    /// Resets the session only if it has no audio or video content (atomic operation).
+    ///
+    /// - Returns: `true` if reset was performed, `false` if session has content
+    public func resetIfEmpty() -> Bool {
+        guard !self._currentClipHasAudio && !self._currentClipHasVideo else {
+            return false
+        }
+
+        self.endClip(completionHandler: nil)
         self._videoInput = nil
         self._audioInput = nil
         self._pixelBufferAdapter = nil
-
+        self._skippedAudioBuffers = []
         self._videoConfiguration = nil
         self._audioConfiguration = nil
-    }
 
+        Logger.session.info("Reset empty session")
+        return true
+    }
 }
 
 // MARK: - setup
@@ -313,7 +474,7 @@ extension NextLevelSession {
         do {
             self._writer = try AVAssetWriter(url: url, fileType: self.fileType)
             if let writer = self._writer {
-                writer.shouldOptimizeForNetworkUse = true
+                writer.shouldOptimizeForNetworkUse = self.shouldOptimizeForNetworkUse
                 writer.metadata = NextLevel.assetWriterMetadata
 
                 if let videoInput = self._videoInput {
@@ -362,7 +523,7 @@ extension NextLevelSession {
 extension NextLevelSession {
 
     /// Completion handler type for appending a sample buffer
-    public typealias NextLevelSessionAppendSampleBufferCompletionHandler = (_: Bool) -> Void
+    public typealias NextLevelSessionAppendSampleBufferCompletionHandler = @Sendable (_: Bool) -> Void
 
     /// Append video sample buffer frames to a session for recording.
     ///
@@ -378,13 +539,13 @@ extension NextLevelSession {
         var frameDuration = minFrameDuration
         let offsetBufferTimestamp = CMTimeSubtract(timestamp, self._timeOffset)
 
+        // Fix for Issue #278: Removed cumulative offset accumulation that caused time skips
+        // Timescale should be applied to duration only, not accumulated as offset every frame
         if let timeScale = self._videoConfiguration?.timescale,
             timeScale != 1.0 {
             let scaledDuration = CMTimeMultiplyByFloat64(minFrameDuration, multiplier: timeScale)
-            if self._currentClipDuration.value > 0 {
-                self._timeOffset = CMTimeAdd(self._timeOffset, CMTimeSubtract(minFrameDuration, scaledDuration))
-            }
             frameDuration = scaledDuration
+            Logger.video.debug("Applied timescale \(timeScale) to frame duration: \(frameDuration.seconds)s")
         }
 
         if let videoInput = self._videoInput,
@@ -426,13 +587,13 @@ extension NextLevelSession {
         var frameDuration = minFrameDuration
         let offsetBufferTimestamp = CMTimeSubtract(timestamp, self._timeOffset)
 
+        // Fix for Issue #278: Removed cumulative offset accumulation that caused time skips
+        // Timescale should be applied to duration only, not accumulated as offset every frame
         if let timeScale = self._videoConfiguration?.timescale,
             timeScale != 1.0 {
             let scaledDuration = CMTimeMultiplyByFloat64(minFrameDuration, multiplier: timeScale)
-            if self._currentClipDuration.value > 0 {
-                self._timeOffset = CMTimeAdd(self._timeOffset, CMTimeSubtract(minFrameDuration, scaledDuration))
-            }
             frameDuration = scaledDuration
+            Logger.video.debug("Applied timescale \(timeScale) to frame duration: \(frameDuration.seconds)s")
         }
 
         if let videoInput = self._videoInput,
@@ -465,54 +626,50 @@ extension NextLevelSession {
     ///   - completionHandler: Handler when a frame appending operation completes or fails
     public func appendAudio(withSampleBuffer sampleBuffer: CMSampleBuffer, completionHandler: @escaping NextLevelSessionAppendSampleBufferCompletionHandler) {
         self.startSessionIfNecessary(timestamp: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
-        self._audioQueue.async {
 
-            var hasFailed = false
+        var hasFailed = false
 
-            let buffers = self._skippedAudioBuffers + [sampleBuffer]
-            self._skippedAudioBuffers = []
-            var failedBuffers: [CMSampleBuffer] = []
+        let buffers = self._skippedAudioBuffers + [sampleBuffer]
+        self._skippedAudioBuffers = []
+        nonisolated(unsafe) var failedBuffers: [CMSampleBuffer] = []
 
-            buffers.forEach { buffer in
-                let duration = CMSampleBufferGetDuration(buffer)
-                if let adjustedBuffer = CMSampleBuffer.createSampleBuffer(fromSampleBuffer: buffer, withTimeOffset: self._timeOffset, duration: duration) {
-                    let presentationTimestamp = CMSampleBufferGetPresentationTimeStamp(adjustedBuffer)
-                    let lastTimestamp = CMTimeAdd(presentationTimestamp, duration)
+        buffers.forEach { buffer in
+            let duration = CMSampleBufferGetDuration(buffer)
+            if let adjustedBuffer = CMSampleBuffer.createSampleBuffer(fromSampleBuffer: buffer, withTimeOffset: self._timeOffset, duration: duration) {
+                let presentationTimestamp = CMSampleBufferGetPresentationTimeStamp(adjustedBuffer)
+                let lastTimestamp = CMTimeAdd(presentationTimestamp, duration)
 
-                    if let audioInput = self._audioInput,
-                        audioInput.isReadyForMoreMediaData,
-                        audioInput.append(adjustedBuffer) {
-                        self._lastAudioTimestamp = lastTimestamp
+                if let audioInput = self._audioInput,
+                    audioInput.isReadyForMoreMediaData,
+                    audioInput.append(adjustedBuffer) {
+                    self._lastAudioTimestamp = lastTimestamp
 
-                        if !self.currentClipHasVideo {
-                            self._currentClipDuration = CMTimeSubtract(lastTimestamp, self._startTimestamp)
-                        }
-
-                        self._currentClipHasAudio = true
-
-                    } else {
-                        failedBuffers.append(buffer)
-                        hasFailed = true
+                    if !self.currentClipHasVideo {
+                        self._currentClipDuration = CMTimeSubtract(lastTimestamp, self._startTimestamp)
                     }
+
+                    self._currentClipHasAudio = true
+
+                } else {
+                    failedBuffers.append(buffer)
+                    hasFailed = true
                 }
             }
-
-            self._skippedAudioBuffers = failedBuffers
-            completionHandler(!hasFailed)
         }
+
+        self._skippedAudioBuffers = failedBuffers
+        completionHandler(!hasFailed)
     }
 
     /// Resets a session to the initial state.
     public func reset() {
-        self.executeClosureSyncOnSessionQueueIfNecessary {
-            self.endClip(completionHandler: nil)
-            self._videoInput = nil
-            self._audioInput = nil
-            self._pixelBufferAdapter = nil
-            self._skippedAudioBuffers = []
-            self._videoConfiguration = nil
-            self._audioConfiguration = nil
-        }
+        self.endClip(completionHandler: nil)
+        self._videoInput = nil
+        self._audioInput = nil
+        self._pixelBufferAdapter = nil
+        self._skippedAudioBuffers = []
+        self._videoConfiguration = nil
+        self._audioConfiguration = nil
     }
 
     private func startSessionIfNecessary(timestamp: CMTime) {
@@ -525,19 +682,17 @@ extension NextLevelSession {
     // create
 
     /// Completion handler type for ending a clip
-    public typealias NextLevelSessionEndClipCompletionHandler = (_: NextLevelClip?, _: Error?) -> Void
+    public typealias NextLevelSessionEndClipCompletionHandler = @Sendable (_: NextLevelClip?, _: Error?) -> Void
 
     /// Starts a clip
     public func beginClip() {
-        self.executeClosureSyncOnSessionQueueIfNecessary {
-            if self._writer == nil {
-                self.setupWriter()
-                self._currentClipDuration = CMTime.zero
-                self._currentClipHasAudio = false
-                self._currentClipHasVideo = false
-            } else {
-                print("NextLevel, clip has already been created.")
-            }
+        if self._writer == nil {
+            self.setupWriter()
+            self._currentClipDuration = CMTime.zero
+            self._currentClipHasAudio = false
+            self._currentClipHasVideo = false
+        } else {
+            print("NextLevel, clip has already been created.")
         }
     }
 
@@ -545,58 +700,82 @@ extension NextLevelSession {
     ///
     /// - Parameter completionHandler: Handler for when a clip is finalized or finalization fails
     public func endClip(completionHandler: NextLevelSessionEndClipCompletionHandler?) {
-        self.executeClosureSyncOnSessionQueueIfNecessary {
-            self._audioQueue.sync {
-                if self._currentClipHasStarted {
-                    self._currentClipHasStarted = false
+        if self._currentClipHasStarted {
+            self._currentClipHasStarted = false
 
-                    if let writer = self._writer {
-                        if !self.currentClipHasAudio && !self.currentClipHasVideo {
-                            writer.cancelWriting()
+            if let writer = self._writer {
+                if !self.currentClipHasAudio && !self.currentClipHasVideo {
+                    writer.cancelWriting()
 
-                            self.removeFile(fileUrl: writer.outputURL)
-                            self.destroyWriter()
+                    self.removeFile(fileUrl: writer.outputURL)
+                    self.destroyWriter()
 
-                            if let completionHandler = completionHandler {
-                                DispatchQueue.main.async {
-                                    completionHandler(nil, nil)
-                                }
-                            }
-                        } else {
-                            // print("ending session \(CMTimeGetSeconds(self._currentClipDuration))")
-                            writer.endSession(atSourceTime: CMTimeAdd(self._currentClipDuration, self._startTimestamp))
-                            writer.finishWriting(completionHandler: {
-                                self.executeClosureSyncOnSessionQueueIfNecessary {
-                                    var clip: NextLevelClip?
-                                    let url = writer.outputURL
-                                    let error = writer.error
-
-                                    if error == nil {
-                                        clip = NextLevelClip(url: url, infoDict: nil)
-                                        if let clip = clip {
-                                            self.add(clip: clip)
-                                        }
-                                    }
-
-                                    self.destroyWriter()
-
-                                    if let completionHandler = completionHandler {
-                                        DispatchQueue.main.async {
-                                            completionHandler(clip, error)
-                                        }
-                                    }
-                                }
-                            })
-                            return
+                    if let completionHandler = completionHandler {
+                        DispatchQueue.main.async {
+                            completionHandler(nil, nil)
                         }
                     }
+                } else {
+                    // print("ending session \(CMTimeGetSeconds(self._currentClipDuration))")
+                    writer.endSession(atSourceTime: CMTimeAdd(self._currentClipDuration, self._startTimestamp))
+                    // Store output URL before finishing writing (AVAssetWriter is not Sendable)
+                    let outputURL = writer.outputURL
+                    writer.finishWriting(completionHandler: { [weak self] in
+                        Task { [weak self, outputURL, completionHandler] in
+                            // Retrieve writer from URL after finishing
+                            await self?.handleFinishedWritingAtURL(outputURL, completionHandler: completionHandler)
+                        }
+                    })
+                    return
                 }
+            }
+        }
 
-                if let completionHandler = completionHandler {
-                    DispatchQueue.main.async {
-                        completionHandler(nil, NextLevelError.notReadyToRecord)
-                    }
-                }
+        if let completionHandler = completionHandler {
+            DispatchQueue.main.async {
+                completionHandler(nil, NextLevelError.notReadyToRecord)
+            }
+        }
+    }
+
+    private func handleFinishedWriting(writer: AVAssetWriter, completionHandler: NextLevelSessionEndClipCompletionHandler?) {
+        var clip: NextLevelClip?
+        let url = writer.outputURL
+        let error = writer.error
+
+        if error == nil {
+            clip = NextLevelClip(url: url, infoDict: nil)
+            if let clip = clip {
+                self.add(clip: clip)
+            }
+        }
+
+        self.destroyWriter()
+
+        if let completionHandler = completionHandler {
+            DispatchQueue.main.async {
+                completionHandler(clip, error)
+            }
+        }
+    }
+
+    private func handleFinishedWritingAtURL(_ url: URL, completionHandler: NextLevelSessionEndClipCompletionHandler?) {
+        var clip: NextLevelClip?
+        // Writer has finished - check if clip was successfully written
+        let error = self._writer?.error
+
+        if error == nil {
+            clip = NextLevelClip(url: url, infoDict: nil)
+            if let clip = clip {
+                self.add(clip: clip)
+            }
+        }
+
+        self.destroyWriter()
+
+        if let completionHandler = completionHandler {
+            DispatchQueue.main.async {
+                completionHandler(clip, error)
             }
         }
     }
@@ -626,10 +805,8 @@ extension NextLevelSession {
     ///
     /// - Parameter clip: Clip to be added
     public func add(clip: NextLevelClip) {
-        self.executeClosureSyncOnSessionQueueIfNecessary {
-            self._clips.append(clip)
-            self._totalDuration = CMTimeAdd(self._totalDuration, clip.duration)
-        }
+        self._clips.append(clip)
+        self._totalDuration = CMTimeAdd(self._totalDuration, clip.duration)
     }
 
     /// Adds a specific clip to a session at the desired index.
@@ -638,23 +815,19 @@ extension NextLevelSession {
     ///   - clip: Clip to be added
     ///   - idx: Index at which to add the clip
     public func add(clip: NextLevelClip, at idx: Int) {
-        self.executeClosureSyncOnSessionQueueIfNecessary {
-            self._clips.insert(clip, at: idx)
-            self._totalDuration = CMTimeAdd(self._totalDuration, clip.duration)
-        }
+        self._clips.insert(clip, at: idx)
+        self._totalDuration = CMTimeAdd(self._totalDuration, clip.duration)
     }
 
     /// Removes a specific clip from a session.
     ///
     /// - Parameter clip: Clip to be removed
     public func remove(clip: NextLevelClip) {
-        self.executeClosureSyncOnSessionQueueIfNecessary {
-            if let idx = self._clips.firstIndex(where: { clipToEvaluate -> Bool in
-                clip.uuid == clipToEvaluate.uuid
-            }) {
-                self._clips.remove(at: idx)
-                self._totalDuration = CMTimeSubtract(self._totalDuration, clip.duration)
-            }
+        if let idx = self._clips.firstIndex(where: { clipToEvaluate -> Bool in
+            clip.uuid == clipToEvaluate.uuid
+        }) {
+            self._clips.remove(at: idx)
+            self._totalDuration = CMTimeSubtract(self._totalDuration, clip.duration)
         }
     }
 
@@ -664,14 +837,12 @@ extension NextLevelSession {
     ///   - idx: Index of the clip to remove
     ///   - removeFile: True to remove the associated file with the clip
     public func remove(clipAt idx: Int, removeFile: Bool) {
-        self.executeClosureSyncOnSessionQueueIfNecessary {
-            if self._clips.indices.contains(idx) {
-                let clip = self._clips.remove(at: idx)
-                self._totalDuration = CMTimeSubtract(self._totalDuration, clip.duration)
+        if self._clips.indices.contains(idx) {
+            let clip = self._clips.remove(at: idx)
+            self._totalDuration = CMTimeSubtract(self._totalDuration, clip.duration)
 
-                if removeFile {
-                    clip.removeFile()
-                }
+            if removeFile {
+                clip.removeFile()
             }
         }
     }
@@ -680,72 +851,69 @@ extension NextLevelSession {
     ///
     /// - Parameter removeFiles: When true, associated files are also removed.
     public func removeAllClips(removeFiles: Bool = true) {
-        self.executeClosureAsyncOnSessionQueueIfNecessary {
-            while !self._clips.isEmpty {
-                if let clipToRemove = self._clips.first {
-                    if removeFiles {
-                        clipToRemove.removeFile()
-                    }
-                    self._clips.removeFirst()
+        while !self._clips.isEmpty {
+            if let clipToRemove = self._clips.first {
+                if removeFiles {
+                    clipToRemove.removeFile()
                 }
+                self._clips.removeFirst()
             }
-            self._totalDuration = CMTime.zero
         }
+        self._totalDuration = CMTime.zero
     }
 
     /// Removes the last recorded clip for a session, "Undo".
     public func removeLastClip() {
-        self.executeClosureSyncOnSessionQueueIfNecessary {
-            if !self._clips.isEmpty,
-               let clipToRemove = self.clips.last {
-                self.remove(clip: clipToRemove)
-            }
+        if !self._clips.isEmpty,
+           let clipToRemove = self.clips.last {
+            self.remove(clip: clipToRemove)
         }
     }
 
     /// Completion handler type for merging clips, optionals indicate success or failure when nil
-    public typealias NextLevelSessionMergeClipsCompletionHandler = (_: URL?, _: Error?) -> Void
+    public typealias NextLevelSessionMergeClipsCompletionHandler = @Sendable (_: URL?, _: Error?) -> Void
 
     /// Merges all existing recorded clips in the session and exports to a file.
     ///
     /// - Parameters:
     ///   - preset: AVAssetExportSession preset name for export
     ///   - completionHandler: Handler for when the merging process completes
+    ///
+    /// - Note: This method is actor-isolated and thread-safe.
     public func mergeClips(usingPreset preset: String, completionHandler: @escaping NextLevelSessionMergeClipsCompletionHandler) {
-        self.executeClosureAsyncOnSessionQueueIfNecessary {
-            let filename = "\(self.identifier.uuidString)-NL-merged.\(self.fileExtension)"
+        let filename = "\(self.identifier.uuidString)-NL-merged.\(self.fileExtension)"
 
-            let outputURL = NextLevelClip.clipURL(withFilename: filename, directoryPath: self.outputDirectory)
-            var asset: AVAsset?
+        let outputURL = NextLevelClip.clipURL(withFilename: filename, directoryPath: self.outputDirectory)
+        var asset: AVAsset?
 
-            if !self._clips.isEmpty {
+        if !self._clips.isEmpty {
 
-                if self._clips.count == 1 {
-                    debugPrint("NextLevel, warning, a merge was requested for a single clip, use lastClipUrl instead")
-                }
+            if self._clips.count == 1 {
+                debugPrint("NextLevel, warning, a merge was requested for a single clip, use lastClipUrl instead")
+            }
 
-                asset = self.asset
+            asset = self.asset
 
-                if let exportAsset = asset, let exportURL = outputURL {
-                    self.removeFile(fileUrl: exportURL)
+            if let exportAsset = asset, let exportURL = outputURL {
+                self.removeFile(fileUrl: exportURL)
 
-                    if let exportSession = AVAssetExportSession(asset: exportAsset, presetName: preset) {
-                        exportSession.shouldOptimizeForNetworkUse = true
-                        exportSession.outputURL = exportURL
-                        exportSession.outputFileType = self.fileType
-                        exportSession.exportAsynchronously {
-                            DispatchQueue.main.async {
-                                completionHandler(exportURL, exportSession.error)
-                            }
+                if let exportSession = AVAssetExportSession(asset: exportAsset, presetName: preset) {
+                    exportSession.shouldOptimizeForNetworkUse = self.shouldOptimizeForNetworkUse
+                    exportSession.outputURL = exportURL
+                    exportSession.outputFileType = self.fileType
+                    exportSession.exportAsynchronously {
+                        let error = exportSession.error
+                        DispatchQueue.main.async {
+                            completionHandler(exportURL, error)
                         }
-                        return
                     }
+                    return
                 }
             }
+        }
 
-            DispatchQueue.main.async {
-                completionHandler(nil, NextLevelError.unknown)
-            }
+        DispatchQueue.main.async {
+            completionHandler(nil, NextLevelError.unknown)
         }
     }
 }
@@ -754,14 +922,14 @@ extension NextLevelSession {
 
 extension NextLevelSession {
 
+    /// Appends clips to a composition (actor-isolated, thread-safe).
     internal func appendClips(toComposition composition: AVMutableComposition, audioMix: AVMutableAudioMix? = nil) {
-        self.executeClosureSyncOnSessionQueueIfNecessary {
-            var videoTrack: AVMutableCompositionTrack?
-            var audioTrack: AVMutableCompositionTrack?
+        var videoTrack: AVMutableCompositionTrack?
+        var audioTrack: AVMutableCompositionTrack?
 
-            var currentTime = composition.duration
+        var currentTime = composition.duration
 
-            for clip: NextLevelClip in self._clips {
+        for clip: NextLevelClip in self._clips {
                 if let asset = clip.asset {
                     let videoAssetTracks = asset.tracks(withMediaType: AVMediaType.video)
                     let audioAssetTracks = asset.tracks(withMediaType: AVMediaType.audio)
@@ -807,7 +975,6 @@ extension NextLevelSession {
                     currentTime = composition.duration
                 }
             }
-        }
     }
 
     private func appendTrack(track: AVAssetTrack, toCompositionTrack compositionTrack: AVMutableCompositionTrack, withStartTime time: CMTime, range: CMTime) -> CMTime {
@@ -865,16 +1032,47 @@ extension NextLevelSession {
 
 extension NextLevelSession {
 
-    internal func executeClosureAsyncOnSessionQueueIfNecessary(withClosure closure: @escaping () -> Void) {
-        self._sessionQueue.async(execute: closure)
-    }
-
-    internal func executeClosureSyncOnSessionQueueIfNecessary(withClosure closure: @escaping () -> Void) {
-        if DispatchQueue.getSpecific(key: self._sessionQueueKey) != nil {
-            closure()
-        } else {
-            self._sessionQueue.sync(execute: closure)
-        }
-    }
+    // Note: Queue-based execution methods removed - actor provides automatic isolation
+    // internal func executeClosureAsyncOnSessionQueueIfNecessary(withClosure closure: @escaping () -> Void)
+    // internal func executeClosureSyncOnSessionQueueIfNecessary(withClosure closure: @escaping () -> Void)
 
 }
+
+// MARK: - Async/Await API
+
+/// Modern async/await API for NextLevelSession
+@available(iOS 15.0, *)
+extension NextLevelSession {
+
+    /// Merges all existing recorded clips in the session and exports to a file using async/await.
+    ///
+    /// This is a modern Swift Concurrency wrapper around the completion handler-based ``mergeClips(usingPreset:completionHandler:)`` method.
+    ///
+    /// - Parameter preset: AVAssetExportSession preset name for export (e.g., AVAssetExportPresetHighestQuality)
+    /// - Returns: URL of the merged video file
+    /// - Throws: Error if the merge operation fails
+    ///
+    /// ## Example
+    /// ```swift
+    /// do {
+    ///     let url = try await session.mergeClips(usingPreset: AVAssetExportPresetHighestQuality)
+    ///     print("Merged video saved to: \(url)")
+    /// } catch {
+    ///     print("Merge failed: \(error)")
+    /// }
+    /// ```
+    public func mergeClips(usingPreset preset: String) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            self.mergeClips(usingPreset: preset) { url, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let url = url {
+                    continuation.resume(returning: url)
+                } else {
+                    continuation.resume(throwing: NextLevelError.unknown)
+                }
+            }
+        }
+    }
+}
+

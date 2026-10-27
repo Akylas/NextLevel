@@ -31,7 +31,7 @@ import MobileCoreServices
 
 private let NextLevelGIFCreatorQueueIdentifier = "engineering.NextLevel.GIF"
 
-public class NextLevelGIFCreator {
+public class NextLevelGIFCreator: @unchecked Sendable {
 
     // MARK: - properties
 
@@ -70,7 +70,7 @@ public class NextLevelGIFCreator {
     ///   - delay: Time between each frame
     ///   - loopCount: Number of loops built into the sequence, default is 0
     ///   - completionHandler: Completion handler called when the operation finishes with success or failure
-    public func create(gifWithImages images: [UIImage], delay: Float, loopCount: Int = 0, completionHandler: ((_ completed: Bool, _ gifPath: URL?) -> Void)? = nil) {
+    public func create(gifWithImages images: [UIImage], delay: Float, loopCount: Int = 0, completionHandler: (@Sendable (_ completed: Bool, _ gifPath: URL?) -> Void)? = nil) {
         guard let outputFilePath = self.createOutputFilePath() else {
             DispatchQueue.main.async {
                 completionHandler?(false, nil)
