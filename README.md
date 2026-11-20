@@ -73,7 +73,7 @@ To get a fake camera feed on the iOS Simulator, enable the `SimulatorCamera` tra
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Akylas/NextLevel", from: "0.19.1", traits: ["SimulatorCamera"])
+    .package(url: "https://github.com/Akylas/NextLevel", from: "0.19.2", traits: ["SimulatorCamera"])
 ]
 ```
 
@@ -82,7 +82,7 @@ Without the trait, NextLevel has no extra dependency and the Simulator uses the 
 ### CocoaPods
 
 ```ruby
-pod "NextLevel", "~> 0.19.1"
+pod "NextLevel", "~> 0.19.2"
 ```
 
 ### Manual Integration

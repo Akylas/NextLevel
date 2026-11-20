@@ -1046,6 +1046,13 @@ extension NextLevel {
                 _ = self.addAudioOuput()
             }
             _ = self.addVideoOutput()
+            // videoWithoutAudio also serves live frames + photos: capturePhoto() needs the photo output
+            if self.captureMode == .videoWithoutAudio {
+                let hasPhotoOutput = self._photoOutput.map { session.outputs.contains($0) } ?? false
+                if !hasPhotoOutput {
+                    _ = self.addPhotoOutput()
+                }
+            }
             #if USE_TRUE_DEPTH
             if self.depthDataCaptureEnabled {
                 _ = self.addDepthDataOutput()
@@ -1402,10 +1409,6 @@ extension NextLevel {
             }
             break
         case .videoWithoutAudio:
-            if let photoOutput = self._photoOutput, session.outputs.contains(photoOutput) {
-                session.removeOutput(photoOutput)
-                self._photoOutput = nil
-            }
             if let audioOutput = self._audioOutput, session.outputs.contains(audioOutput) {
                 session.removeOutput(audioOutput)
                 self._audioOutput = nil
@@ -2926,7 +2929,8 @@ extension NextLevel {
         return capturePhotoForSimulator()
         #endif
         guard let photoOutput = self._photoOutput, let _ = photoOutput.connection(with: AVMediaType.video) else {
-             return
+            print("NextLevel, capturePhoto ignored: no photo output in capture mode \(self.captureMode)")
+            return
          }
 
         if let formatDictionary = self.photoConfiguration.avcaptureDictionary() {
